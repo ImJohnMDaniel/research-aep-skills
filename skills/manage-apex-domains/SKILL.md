@@ -1,21 +1,25 @@
 ---
 name: manage-apex-domains
-description: Automates the creation or surgical update of a standard Apex Domain layer for a specific SObject following AT4DX patterns. This skill generates/updates the Domain class, interface, trigger, binding record, and test class while preserving existing logic, followed by an automatic deployment to the current Salesforce org.
+description: Automates the creation, surgical update, and extension of standard Apex Domain layers for SObjects following AT4DX patterns. This skill manages Domain classes, interfaces, triggers, and the Domain Process Injection pattern (Criteria/Actions/Bindings).
 ---
 
 # Manage Apex Domains (AT4DX)
 
-This skill manages the complete "Domain" layer for an SObject, following the AT4DX architectural standard.
+This skill manages the "Domain" layer for an SObject, including both the core class structure and the **Domain Process Injection** pattern for modular extension, following the AT4DX architectural standard.
 
 ## Architectural Mandates
 
 - **Inheritance**: All Domain classes MUST inherit from `ApplicationSObjectDomain`.
 - **Interfaces**: All Domains MUST implement a corresponding interface (e.g., `IAccounts`) which extends `IApplicationSObjectDomain`.
 - **Factory Registration**: Domains MUST be registered via `ApplicationFactory_DomainBinding` custom metadata to enable Force-DI resolution.
-- **Access**: Use the `newInstance()` static methods to access domains via the `Application.Domain` factory.
-- **Constructor**: All Domain classes MUST include an inner `Constructor` class implementing `fflib_SObjectDomain.IConstructable`.
+- **Access**: Use the `newInstance()` static methods via the `Application.Domain` factory.
+- **Trigger Scopes**: All triggers MUST include all 7 scopes (after insert, after update, before insert, before update, after delete, before delete, after undelete).
+- **Injection Pattern**: Use Domain Process Injection to add logic to existing Domains, especially those in dependency packages (like `universal-common`).
 
-## Workflow
+## Workflows
+
+### 1. Core Domain Management
+Generates or surgically updates the Domain class, Interface, Trigger, and Unit Test.
 
 1.  **Validation:** Checks if the SObject exists in the local project's metadata.
 2.  **Surgical Update / Creation:**
@@ -24,24 +28,36 @@ This skill manages the complete "Domain" layer for an SObject, following the AT4
 3.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}` convention (40-char limit), handling standard/custom objects appropriately.
 4.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
 
-## Usage
-
+- **Usage**:
 To generate or update a domain, run the bundled script:
 
-```bash
-node c:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\manage-apex-domains\scripts\create_domain.cjs <SObjectName> [AppPrefix]
-```
+  ```bash
+  node ./scripts/create_domain.cjs <SObjectName> [AppPrefix]
+  ```
 
 Example:
 ```bash
-node c:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\manage-apex-domains\scripts\create_domain.cjs Account EEORA
+node ./scripts/create_domain.cjs Account EEORA
 ```
+
+### 2. Domain Process Injection (Modular Extension)
+Automates the creation of modular Criteria or Action classes and their Metadata bindings to inject logic into an existing Domain flow.
+- **Usage**:
+  ```bash
+  node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> [Operation] [Order]
+  ```
+- **Types**: `Criteria`, `CriteriaWithExistingRecs`, `Action`, `ActionWithExistingRecs`, `QueueableAction`.
+- **Asynchronicity**: For async steps, set `ExecuteAsynchronous__c = true` and use `QueueableAction`.
 
 ## Resources
 
+### scripts/
+- `create_domain.cjs`: Manages standard Domain layers.
+- `create_injection.cjs`: Manages injectable modular components.
+
 ### assets/
-- `DomainTemplate.cls`: Boilerplate for the Domain class (inherits `ApplicationSObjectDomain`).
-- `InterfaceTemplate.cls`: Boilerplate for the Domain interface.
-- `TestTemplate.cls`: Boilerplate for the Domain test class.
-- `TriggerTemplate.trigger`: Boilerplate for the SObject trigger.
-- `BindingTemplate.xml`: Custom Metadata binding for `ApplicationFactory_DomainBinding`.
+- `DomainTemplate.cls`, `InterfaceTemplate.cls`, `TriggerTemplate.trigger`, `TestTemplate.cls`
+- `CriteriaTemplate.cls`, `CriteriaWithExistingRecsTemplate.cls`
+- `ActionTemplate.cls`, `ActionWithExistingRecsTemplate.cls`
+- `QueueableActionTemplate.cls`
+- `BindingTemplate.xml`: Universal template for both Domain and Process bindings.
