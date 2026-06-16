@@ -25,12 +25,18 @@ Use this pattern to add logic to existing Domains, especially when the Domain cl
     - Implement `IDomainProcessCriteria` or `IDomainProcessCriteriaWithExistingRecs`.
 2.  **Action**: Performs discrete operations on the filtered subset.
     - MUST extend `DomainProcessAbstractAction`.
-    - Implement `IDomainProcessAction` or `IDomainProcessActionWithExistingRecs`.
+    - Implement `IDomainProcessAction`, `IDomainProcessActionWithExistingRecs`, or `IDomainProcessQueueableAction`.
 
 ### Configuration (DomainProcessBinding__mdt)
 Logic is orchestrated via Custom Metadata using the `OrderOfExecution__c` field:
 - **Process ID**: The whole number portion (e.g., `10.0`) identifies the distinct process.
 - **Step Sequence**: The decimal portion (e.g., `10.1`, `10.2`) defines the execution order of criteria and actions within that process.
+
+### Framework-Managed Asynchronicity (Preferred Pattern)
+When a process step requires asynchronous execution (e.g., to avoid Mixed DML or Governor Limit constraints), utilize the framework's built-in async capabilities:
+- **Configuration**: Set `ExecuteAsynchronous__c = true` on the `DomainProcessBinding__mdt` record.
+- **Implementation**: The Action class MUST implement **`IDomainProcessQueueableAction`**.
+- **Advantage**: This decouples the business logic from the `Queueable` scaffolding. The framework handles the `System.enqueueJob` orchestration, allowing the Action class to focus exclusively on business logic. This is the preferred approach for new asynchronous logic to improve maintainability and leverage core framework features.
 
 > **Mandate**: Always search for and reuse existing Criteria and Actions from dependency packages before creating new ones.
 
@@ -56,10 +62,7 @@ If the project has a dependency on `universal-common` (prefix `UCMN`), most stan
 ### Discovery Workflow
 1.  **Deduce Name**: Based on the `UCMN` prefix and standard pluralization (e.g., `UCMN_UsersSelector`).
 2.  **Check Local Symbols**: Look in `.gemini/org-symbols/<OrgID>/` for the deduced class.
-3.  **Fetch if Missing**: If the deduced class is not found locally, use the `learn-org-symbol-table` skill to fetch it:
-    ```bash
-    node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\learn-org-symbol-table\scripts\learn_symbols.cjs UCMN_UsersSelector
-    ```
+3.  **Fetch if Missing**: If the deduced class is not found locally, use the `learn-org-symbol-table` skill to fetch it.
 4.  **Evaluate**: Inspect the `SymbolTable` JSON to see existing methods/fields.
     - **Trigger Existence**: If a Domain class exists for an SObject, assume a corresponding trigger also exists for that SObject in that package.
     - **Logic Extension**: If the required logic is missing, implement **Domain Process Injection** rather than creating a new Domain class.
