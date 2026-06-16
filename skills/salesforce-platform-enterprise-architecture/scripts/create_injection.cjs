@@ -18,8 +18,8 @@ async function run() {
     try {
         const sfdxProject = JSON.parse(fs.readFileSync("sfdx-project.json", "utf8"));
         const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
-        
-        const skillPath = path.join("C:", "Users", "BBIJS1O", "workspace", "gemini-extensions", "sf-aep-skills", "skills", "salesforce-platform-enterprise-architecture");
+
+        const skillPath = path.join(__dirname, "..");
         const assetsDir = path.join(skillPath, "assets");
 
         const subDir = type.includes("Criteria") ? "criteria" : "actions";
@@ -61,7 +61,7 @@ async function run() {
             .replace(/{{Order}}/g, order)
             .replace(/{{Operation}}/g, operation)
             .replace(/{{Type}}/g, type.includes("Criteria") ? "Criteria" : "Action");
-        
+
         fs.writeFileSync(bindingPath, bindingContent);
         console.log(`Created Binding: ${bindingPath}`);
 

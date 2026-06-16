@@ -19,13 +19,13 @@ To run the learning process for specific classes:
 
 ```bash
 # Fetch symbols for specific classes
-node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\learn-org-symbol-table\scripts\learn_symbols.cjs ClassName1 ClassName2
+node ./scripts/learn_symbols.cjs ClassName1 ClassName2
 
 # Fetch symbols using a pattern
-node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\learn-org-symbol-table\scripts\learn_symbols.cjs --pattern "UCMN_*"
+node ./scripts/learn_symbols.cjs --pattern "UCMN_*"
 
 # Fetch all missing symbols (Warning: Slow)
-node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\learn-org-symbol-table\scripts\learn_symbols.cjs --all
+node ./scripts/learn_symbols.cjs --all
 ```
 
 ## Storage Structure

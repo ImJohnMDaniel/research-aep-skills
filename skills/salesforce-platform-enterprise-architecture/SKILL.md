@@ -41,7 +41,7 @@ Use this pattern to add logic to existing Domains, especially when the Domain cl
 To automate the creation of Criteria or Action classes and their Metadata bindings, run:
 
 ```bash
-node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\salesforce-platform-enterprise-architecture\scripts\create_injection.cjs <ComponentName> <SObjectName> <Type> [Operation] [Order]
+node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> [Operation] [Order]
 ```
 - **Type**: `Criteria`, `CriteriaWithExistingRecs`, `Action`, `ActionWithExistingRecs`, `QueueableAction`
 

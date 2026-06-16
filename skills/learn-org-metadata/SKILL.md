@@ -19,13 +19,13 @@ To fetch metadata for specific objects:
 
 ```bash
 # Fetch specific objects
-node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\learn-org-metadata\scripts\learn_metadata.cjs Account EEORA_AccommRequest__c
+node ./scripts/learn_metadata.cjs Account EEORA_AccommRequest__c
 
 # Fetch using a pattern
-node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\learn-org-metadata\scripts\learn_metadata.cjs --pattern "EEORA_*"
+node ./scripts/learn_metadata.cjs --pattern "EEORA_*"
 
 # Fetch all (Warning: Very slow)
-node C:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\learn-org-metadata\scripts\learn_metadata.cjs --all
+node ./scripts/learn_metadata.cjs --all
 ```
 
 ## Storage Structure
