@@ -17,22 +17,22 @@ This guide details the implementation of Apex Enterprise Patterns using the **AT
 - **Interface**: MUST implement an interface extending `IApplicationSObjectDomain`.
 - **Calling**: `IAccounts domain = (IAccounts) Application.Domain.newInstance(records);`
 
-## Domain Process Injection (Advanced Pattern)
+### Domain Process Injection (Advanced Pattern)
 Use this pattern to add logic to existing Domains, especially when the Domain class resides in a dependency package (like `universal-common`) and cannot be modified directly.
 
-### Components
+#### Components
 1.  **Criteria**: Filters the initial record set to a qualified subset.
     - Implement `IDomainProcessCriteria` or `IDomainProcessCriteriaWithExistingRecs`.
 2.  **Action**: Performs discrete operations on the filtered subset.
     - MUST extend `DomainProcessAbstractAction`.
     - Implement `IDomainProcessAction`, `IDomainProcessActionWithExistingRecs`, or `IDomainProcessQueueableAction`.
 
-### Configuration (DomainProcessBinding__mdt)
+#### Configuration (DomainProcessBinding__mdt)
 Logic is orchestrated via Custom Metadata using the `OrderOfExecution__c` field:
 - **Process ID**: The whole number portion (e.g., `10.0`) identifies the distinct process.
 - **Step Sequence**: The decimal portion (e.g., `10.1`, `10.2`) defines the execution order of criteria and actions within that process.
 
-### Framework-Managed Asynchronicity (Preferred Pattern)
+#### Framework-Managed Asynchronicity (Preferred Pattern)
 When a process step requires asynchronous execution (e.g., to avoid Mixed DML or Governor Limit constraints), utilize the framework's built-in async capabilities:
 - **Configuration**: Set `ExecuteAsynchronous__c = true` on the `DomainProcessBinding__mdt` record.
 - **Implementation**: The Action class MUST implement **`IDomainProcessQueueableAction`**.
@@ -45,6 +45,10 @@ When a process step requires asynchronous execution (e.g., to avoid Mixed DML or
 - **Inheritance**: MUST extend `ApplicationSObjectSelector`.
 - **Interface**: MUST implement an interface extending `IApplicationSObjectSelector`.
 - **Calling**: `IAccountsSelector selector = (IAccountsSelector) Application.Selector.newInstance(Account.SObjectType);`
+
+> **Mandate**: Always utilize the Skill `manage-apex-selectors` before working with SOQL queries or refactoring that relates to SOQL queries.
+
+Generally speaking, inline SOQL queries should be avoided in favor of Selector classes.  
 
 ## Unit of Work
 - **Responsibility**: Managing database transactions (DML).
