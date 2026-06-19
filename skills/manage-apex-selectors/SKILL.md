@@ -29,12 +29,12 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 To generate or update a selector with a specific field list:
 
 ```bash
-node c:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\manage-apex-selectors\scripts\create_selector.cjs <SObjectName> [AppPrefix] --fields=Id,Name,CustomField__c
+node .\skills\manage-apex-selectors\scripts\create_selector.cjs <SObjectName> [AppPrefix] --fields=Id,Name,CustomField__c
 ```
 
 Example:
 ```bash
-node c:\Users\BBIJS1O\workspace\gemini-extensions\sf-aep-skills\skills\manage-apex-selectors\scripts\create_selector.cjs Account EEORA --fields=Id,Name,AccountNumber,Type
+node .\skills\manage-apex-selectors\scripts\create_selector.cjs Account EEORA --fields=Id,Name,AccountNumber,Type
 ```
 
 ## Resources
