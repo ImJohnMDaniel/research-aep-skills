@@ -18,6 +18,7 @@ async function run() {
     try {
         const sfdxProject = JSON.parse(fs.readFileSync("sfdx-project.json", "utf8"));
         const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
+        const apiVersion = sfdxProject.sourceApiVersion || '67.0';
 
         const skillPath = path.join(__dirname, "..");
         const assetsDir = path.join(skillPath, "assets");
@@ -47,7 +48,7 @@ async function run() {
         console.log(`Created Class: ${classPath}`);
 
         // 3. Create Class Meta
-        const classMeta = `<?xml version="1.0" encoding="UTF-8"?>\n<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">\n    <apiVersion>61.0</apiVersion>\n    <status>Active</status>\n</ApexClass>`;
+        const classMeta = `<?xml version="1.0" encoding="UTF-8"?>\n<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">\n    <apiVersion>${apiVersion}</apiVersion>\n    <status>Active</status>\n</ApexClass>`;
         fs.writeFileSync(metaPath, classMeta);
 
         // 4. Create Binding

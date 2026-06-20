@@ -70,6 +70,7 @@ async function run() {
     try {
         const sfdxProject = JSON.parse(fs.readFileSync("sfdx-project.json", "utf8"));
         const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
+        const apiVersion = sfdxProject.sourceApiVersion || '67.0';
 
         const baseSanitized = sanitizeName(sObjectName, appPrefix);
         const pluralSanitized = getPlural(baseSanitized);
@@ -127,7 +128,7 @@ async function run() {
             const metaPath = paths[key] + "-meta.xml";
             if (!fs.existsSync(metaPath)) {
                 const type = key === "trigger" ? "ApexTrigger" : "ApexClass";
-                fs.writeFileSync(metaPath, `<?xml version="1.0" encoding="UTF-8"?>\n<${type} xmlns="http://soap.sforce.com/2006/04/metadata">\n    <apiVersion>61.0</apiVersion>\n    <status>Active</status>\n</${type}>`);
+                fs.writeFileSync(metaPath, `<?xml version="1.0" encoding="UTF-8"?>\n<${type} xmlns="http://soap.sforce.com/2006/04/metadata">\n    <apiVersion>${apiVersion}</apiVersion>\n    <status>Active</status>\n</${type}>`);
             }
         });
 
