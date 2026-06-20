@@ -47,7 +47,10 @@ async function run() {
         console.log(`Found ${sobjectsToDescribe.length} matching SObjects to describe.`);
 
         // 3. Create storage directories
-        const baseDir = path.join('.gemini', 'org-metadata', orgId);
+        const projectTempDir = process.env.GEMINI_PROJECT_TEMP_DIR;
+        const baseDir = projectTempDir 
+            ? path.join(projectTempDir, 'org-metadata', orgId) 
+            : path.join('.gemini', 'org-metadata', orgId);
         const subDirs = {
             sobject: path.join(baseDir, 'sobjects'),
             metadata: path.join(baseDir, 'custom-metadata'),
