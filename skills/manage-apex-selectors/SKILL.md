@@ -16,6 +16,13 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 
 ## Workflow
 
+**1. SObject Type Analysis (Pre-Check)**
+
+Before proceeding, the agent MUST first analyze the SObject API name:
+
+-   **If the SObject has the project prefix (e.g., `EEORA_MyObject__c`):** Proceed to the next step to create a new, project-specific Selector.
+-   **If the SObject is Standard (`User`, `Account`) or from another package (`OtherPrefix__Object__c`):** **STOP.** Do not create a new Selector. The Selector is assumed to exist in a dependency package. Use the `learn-org-symbol-table` skill to discover the API for the existing selector (e.g., `UCMN_AccountsSelector`) and use that in your implementation. This skill should only be used for project-specific SObjects.
+
 1.  **Field List Population**: 
     - Before creating or updating a selector, the agent MUST use the `learn-org-metadata` skill to retrieve the SObject's field list.
     - **Filter**: Exclude all fields with `LongTextArea` or `RichTextArea` data types (`textarea` type with `htmlFormatted: true` or large length) to prevent heap size issues.

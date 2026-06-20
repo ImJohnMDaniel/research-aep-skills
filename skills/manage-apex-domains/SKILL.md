@@ -18,6 +18,13 @@ This skill manages the "Domain" layer for an SObject, including both the core cl
 
 ## Workflows
 
+**SObject Type Analysis (Pre-Check)**
+
+Before proceeding with any Domain creation or update, the agent MUST first analyze the SObject API name:
+
+-   **If the SObject has the project prefix (e.g., `EEORA_MyObject__c`):** Proceed to "1. Core Domain Management" to create/update a project-specific Domain.
+-   **If the SObject is Standard (`User`, `Account`) or from another package (`OtherPrefix__Object__c`):** **STOP.** Do not create a new Domain. The Domain is assumed to exist in a dependency package. Use the `learn-org-symbol-table` skill to discover the API for the existing domain (e.g., `UCMN_Accounts`) and use that in your implementation. This skill should only be used for project-specific SObjects.
+
 ### 1. Core Domain Management
 Generates or surgically updates the Domain class, Interface, Trigger, and Unit Test.
 

@@ -40,6 +40,15 @@ Follow this procedure:
 - **Naming Conventions**: All classes MUST follow the project prefix (e.g., `EEORA_`).
 - **Interfaces**: All layers MUST be accessed via interfaces to support mock-based unit testing.
 
+### Project-Specific vs. Universal Components
+
+A fundamental principle of this architecture is the separation of concerns between project-specific code and shared, universal components (often from dependency packages like `universal-common`).
+
+-   **Project-Specific SObjects**: SObjects with the project's prefix (e.g., `EEORA_`) are managed directly by this project's skills.
+-   **Standard & External SObjects**: Standard Salesforce SObjects (`Account`, `User`, etc.) or SObjects from other packages (`OtherPrefix__Object__c`) are considered "universal". You **MUST** assume that their corresponding Apex Enterprise Pattern layers (Domain, Selector) already exist in a shared dependency.
+
+**CRITICAL**: Before creating a new Domain or Selector for a standard or external SObject, you **MUST** use the `learn-org-symbol-table` skill to find and utilize the existing component (e.g., `UCMN_UsersSelector`). Creating a duplicate layer for a non-project SObject is a critical architectural violation.
+
 ## Workflows
 
 ### 0. Batch Operations (Mandatory)
