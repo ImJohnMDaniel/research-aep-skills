@@ -14,6 +14,10 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 - **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
 - **Access**: Use the `newInstance()` static method to access selectors via the `Application.Selector` factory.
 
+- **Naming Conventions**:
+  - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
+  - **Interface**: `{Prefix}_I{PluralSObjectName}Selector` (e.g., `EEORA_IAccommRequestsSelector`)
+
 ## Workflow
 
 **1. SObject Type Analysis (Pre-Check)**
