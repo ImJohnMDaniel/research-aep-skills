@@ -75,6 +75,9 @@ async function run() {
         const baseSanitized = sanitizeName(sObjectName, appPrefix);
         const pluralSanitized = getPlural(baseSanitized);
 
+        if (pluralSanitized.startsWith(appPrefix + '_')) {
+            pluralSanitized = pluralSanitized.substring(appPrefix.length + 1);
+        }
         const className = enforceLimit(`${appPrefix}_${pluralSanitized}`);
         const interfaceName = enforceLimit(`${appPrefix}_I${pluralSanitized}`);
         const testClassName = enforceLimit(`${appPrefix}_${pluralSanitized}`, "Test");
