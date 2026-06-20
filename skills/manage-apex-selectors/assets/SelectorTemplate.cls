@@ -24,4 +24,20 @@ public inherited sharing class {{ClassName}}
     {
         return (List<{{SObjectType}}>) selectSObjectsById(idSet);
     }
+
+    /*
+    *   // =================================================================
+    *   //  EXAMPLE: Custom Selector Method
+    *   // =================================================================
+    *   // When adding custom query methods, use the newQueryFactory()
+    *   // method to ensure the selector remains testable.
+    *
+    *   public List<{{SObjectType}}> selectBySomeCustomCriteria(Set<String> criteria)
+    *   {
+    *       fflib_QueryFactory queryFactory = newQueryFactory()
+    *           .setCondition('Some_Field__c IN :criteria');
+    *
+    *       return (List<{{SObjectType}}>) Database.query(queryFactory.toSOQL());
+    *   }
+    */
 }

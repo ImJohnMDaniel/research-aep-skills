@@ -29,7 +29,37 @@ Before proceeding, the agent MUST first analyze the SObject API name:
     - **Verification**: If the filtered list contains more than **50 fields** AND the selector class is part of the **current project**, the agent MUST verify with the user via `ask_user` if they wish to include all fields. If the selector is part of a **dependency project** (not in the local source), ignore the 50-field verification and include the fields as needed (or as directed).
 2.  **Creation / Update**: Generates or surgically updates the Selector class, Interface, and Unit Test.
 3.  **Binding**: Creates a custom metadata record in `selectorBindings`.
+...
 4.  **Deployment**: Automatically deploys the artifacts to the org.
+
+### Adding Custom Query Methods
+
+When extending a generated selector with new query methods, you **MUST** use the `newQueryFactory()` method inherited from the base selector. This is critical for maintaining testability.
+
+-   For queries on the selector's primary SObject, call `newQueryFactory()` with no arguments.
+-   For queries on a different SObject (e.g., a related child object), pass the SObject Type to the method, like `newQueryFactory(OtherObject__c.SObjectType)`.
+
+**Correct Usage:**
+```apex
+// In a selector for MyObject__c
+public List<MyObject__c> selectBySomeCriteria(Set<String> names)
+{
+    // Correct: Use the factory method from the base class
+    return (List<MyObject__c>) Database.query(
+        newQueryFactory()
+            .setCondition('Name IN :names')
+            .toSOQL()
+    );
+}
+```
+
+**Incorrect Usage:**
+```apex
+// DO NOT do this. It breaks testability.
+fflib_QueryFactory qf = new fflib_QueryFactory(this);
+// or
+fflib_QueryFactory qf = new fflib_QueryFactory(MyObject__c.SObjectType);
+```
 
 ## Usage
 
