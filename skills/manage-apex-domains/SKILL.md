@@ -16,6 +16,7 @@ This skill manages the "Domain" layer for an SObject, including both the core cl
 - **Calling Domains**: Always call the domain's static `newInstance()` method directly within your business logic. Do not store domains as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
 - **Trigger Scopes**: All triggers MUST include all 7 scopes (after insert, after update, before insert, before update, after delete, before delete, after undelete).
 - **Injection Pattern**: Use Domain Process Injection to add logic to existing Domains, especially those in dependency packages (like `universal-common`).
+- **One Domain, One SObject**: A Domain class is strictly responsible for the business logic of a single SObject. It MUST NOT contain logic for other SObjects. To interact with other records, it must invoke their respective Domain or Service layers. For example, when an `Opportunity` is closed, its Domain class (`Opportunities`) should not directly create an `Order` record. Instead, it should call an `OrdersService` to handle the order creation process, thereby correctly separating the concerns.
 
 - **Naming Conventions**:
   - **Domain Class**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
