@@ -14,6 +14,9 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 - **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
 - **Calling Selectors**: Always call the selector's static `newInstance()` method directly within your business logic. Do not store selectors as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
 - **Access**: Use the `newInstance()` static method to access selectors via the `Application.Selector` factory.
+- **Strict Return Types (No Transformations / Single Records)**: All custom query methods in a Selector class MUST only return either a `List<SObject>` or a `Database.QueryLocator`. They **MUST NOT**:
+  - Return a single `SObject` record (e.g., `User` instead of `List<User>`), as this violates the platform's **bulkification mandate** and is a critical anti-pattern.
+  - Return any non-SObject collection types or maps of primitives (e.g., `Set<String>`, `Map<String, Id>`), as **Selectors must never perform data transformations**; this logic belongs in the calling Service, Domain, or Action layer.
 
 - **Naming Conventions**:
   - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
@@ -49,6 +52,13 @@ When extending a generated selector with new query methods, you **MUST** use the
 
 -   For queries on the selector's primary SObject, call `newQueryFactory()` with no arguments.
 -   For queries on a different SObject (e.g., a related child object), pass the SObject Type to the method, like `newQueryFactory(OtherObject__c.SObjectType)`.
+
+#### Method Signature & Return Type Restrictions
+
+Every custom query method MUST adhere to strict return type guidelines:
+1. **Allowed Return Types**: Only `List<SObject>` (or specific lists like `List<MyObject__c>`) and `Database.QueryLocator` are permitted.
+2. **No Single SObject Records**: You MUST NOT return a single record (e.g. `MyObject__c`). This is a critical violation of bulkification mandates. Always design methods to handle sets of keys or values and return a list of records.
+3. **No Data Transformations**: Selector methods MUST NOT transform SObject data into Map, Set, or other collection types (e.g., converting SObjects into `Map<String, Id>` or `Set<String>`). Returning primitive collections is a major separation-of-concerns anti-pattern. Let the calling Service, Domain, or Action handle all collections and mapping logic.
 
 **Correct Usage:**
 ```apex
