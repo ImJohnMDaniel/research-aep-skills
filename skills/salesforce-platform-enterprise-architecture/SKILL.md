@@ -155,6 +155,19 @@ To efficiently and safely discover dependency selectors (like `UCMN_UsersSelecto
     node ./scripts/learn_symbols.cjs --pattern "UCMN_*"
     ```
 
+### Extending Dependency Layers: The "Read-Only Class" Problem
+
+A common and critical architectural challenge arises when you need to add a new query method to a Selector that comes from a dependency package (e.g., adding a new query to `UCMN_UsersSelector`). Because the class is read-only, you cannot modify it directly.
+
+**The Anti-Pattern (DO NOT DO THIS):**
+The incorrect solution is to create a second, project-specific selector for the same SObject (e.g., `EEORA_UsersSelector`). This creates a "split brain" scenario where there are two sources of truth for queries, leading to confusion, code duplication, and maintenance issues.
+
+**The Correct Pattern: Selector Method Injection**
+The AT4DX framework provides an elegant solution called **Selector Method Injection**. This pattern allows you to write your custom query logic in a small, separate, "injectable" class within your local project. You can then execute this custom logic *through* the original, unmodified dependency selector.
+
+This maintains the "Single Source of Truth" for the SObject's selector while still allowing safe, project-specific extensions.
+
+**For a detailed guide on how to create and use injectable selector methods, refer to the `manage-apex-selectors` skill.**
 
 ## Workflows
 

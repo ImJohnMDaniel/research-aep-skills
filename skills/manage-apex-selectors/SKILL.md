@@ -47,6 +47,115 @@ Before proceeding, the agent MUST first analyze the SObject API name:
 ...
 **5. Deployment**: Automatically deploys the artifacts to the org.
 
+## Workflow: Extending Selectors via Injection
+
+This is the architecturally correct pattern for adding custom query logic to a Selector from a dependency package (e.g., adding a query to `UCMN_UsersSelector`).
+
+To implement, you will create three components in your local project: a **Parameter Class**, an **Injectable Method Class**, and a **Unit Test**.
+
+### 1. Create the Parameter Class
+This class bundles all arguments for your query into a single object.
+
+-   **Action:** Create a new Apex class.
+-   **Naming:** `{MethodName}SelectorParams`
+-   **Implementation:** It MUST `implements ISelectorMethodParameterable`. It contains public member variables for each parameter.
+
+**Example (`EEORA_UsersByStateSelectorParams.cls`):**
+```apex
+public class EEORA_UsersByStateSelectorParams implements ISelectorMethodParameterable {
+    public Set<String> states;
+    public Integer resultLimit;
+}
+```
+
+### 2. Create the Injectable Method Class
+This class contains the actual query logic.
+
+-   **Action:** Create a new Apex class.
+-   **Naming:** `{MethodName}SelectorMethod`
+-   **Implementation:** It MUST `extends AbstractSelectorMethodInjectable` and `implements ISelectorMethodInjectable`. It contains the `selectQuery()` method.
+
+**Example (`EEORA_UsersByStateSelectorMethod.cls`):**
+```apex
+public class EEORA_UsersByStateSelectorMethod
+    extends AbstractSelectorMethodInjectable
+    implements ISelectorMethodInjectable
+{
+    public List<SObject> selectQuery() {
+        // Cast the generic parameters object to your concrete class
+        EEORA_UsersByStateSelectorParams params = (EEORA_UsersByStateSelectorParams) getParams();
+        
+        // Use the query factory from the base class
+        return Database.query(
+            newQueryFactory()
+                .setCondition('State IN :params.states')
+                .setLimit(params.resultLimit)
+                .toSOQL()
+        );
+    }
+}
+```
+*(For queries returning a `Database.QueryLocator`, extend `AbstractSelectorQueryLocatorInjectable` instead.)*
+
+
+### 3. Invoke the Injectable Method
+From your service or domain layer, invoke your new method through the base dependency selector.
+
+**Example (in a service method):**
+```apex
+// 1. Get the base selector from the dependency package
+IUsersSelector usersSelector = (IUsersSelector) Application.Selector.newInstance(User.SObjectType);
+
+// 2. Prepare the parameters
+EEORA_UsersByStateSelectorParams params = new EEORA_UsersByStateSelectorParams();
+params.states = new Set<String>{'CA', 'NY'};
+params.resultLimit = 100;
+
+// 3. Execute the injection
+List<User> users = (List<User>) usersSelector.selectInjection(
+    EEORA_UsersByStateSelectorMethod.class,
+    params
+);
+```
+
+### 4. Create the Unit Test
+Test the injectable method class in isolation.
+
+**Example (`EEORA_UsersByStateSelectorMethod_UT.cls`):**
+```apex
+@IsTest
+private class EEORA_UsersByStateSelectorMethod_UT {
+    @IsTest
+    private static void testQueryConstruction() {
+        // 1. Setup
+        fflib_ApexMocks mocks = new fflib_ApexMocks();
+        // Mock the query factory to intercept calls
+        fflib_QueryFactory mockQueryFactory = (fflib_QueryFactory) mocks.mock(fflib_QueryFactory.class);
+
+        // 2. Prepare parameters
+        EEORA_UsersByStateSelectorParams params = new EEORA_UsersByStateSelectorParams();
+        params.states = new Set<String>{'CA'};
+        params.resultLimit = 50;
+
+        // 3. Instantiate the injectable method
+        EEORA_UsersByStateSelectorMethod method = new EEORA_UsersByStateSelectorMethod();
+        method.setQueryFactory(mockQueryFactory);
+        method.setParameters(params);
+
+        // 4. Execute
+        method.selectQuery();
+
+        // 5. Verify
+        // Use the mock framework to verify that the query was constructed correctly
+        ((fflib_QueryFactory) mocks.verify(mockQueryFactory, 1))
+            .setCondition('State IN :params.states');
+        ((fflib_QueryFactory) mocks.verify(mockQueryFactory, 1))
+            .setLimit(params.resultLimit);
+    }
+}
+```
+***Note: New templates for these files will be available in the `assets` folder: `InjectableMethodTemplate.cls`, `InjectableMethodParamsTemplate.cls`, and `InjectableMethodTestTemplate.cls`.***
+
 ### Adding Custom Query Methods
 
 When extending a generated selector with new query methods, you **MUST** use the `newQueryFactory()` method inherited from the base selector. This is critical for maintaining testability.
