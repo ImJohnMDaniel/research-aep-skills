@@ -17,6 +17,7 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 - **Strict Return Types (No Transformations / Single Records)**: All custom query methods in a Selector class MUST only return either a `List<SObject>` or a `Database.QueryLocator`. They **MUST NOT**:
   - Return a single `SObject` record (e.g., `User` instead of `List<User>`), as this violates the platform's **bulkification mandate** and is a critical anti-pattern.
   - Return any non-SObject collection types or maps of primitives (e.g., `Set<String>`, `Map<String, Id>`), as **Selectors must never perform data transformations**; this logic belongs in the calling Service, Domain, or Action layer.
+- **One Selector, One SObject**: A Selector class is strictly responsible for querying a single SObject. It is a critical anti-pattern for a selector to query another SObject's data, even if it is a related child or parent. Instead, you must invoke the appropriate selector for that object. For example, `AccountSelector` must not query for `Contact` records; it must call `ContactsSelector.newInstance()`. This is enforced by ensuring any call to `newQueryFactory(SomeObject__c.SObjectType)` uses an SObject type that matches the selector's own `getSObjectType()`.
 
 - **Naming Conventions**:
   - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
