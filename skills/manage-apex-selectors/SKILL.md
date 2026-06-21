@@ -12,6 +12,7 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 - **Inheritance**: All Selector classes MUST inherit from `ApplicationSObjectSelector`.
 - **Interfaces**: All Selectors MUST implement a corresponding interface (e.g., `IAccountsSelector`) which extends `IApplicationSObjectSelector` when `at4dx` is present in the project's dependencies. If `at4dx` is not present, custom interfaces are optional but recommended.
 - **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
+- **Calling Selectors**: Always call the selector's static `newInstance()` method directly within your business logic. Do not store selectors as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
 - **Access**: Use the `newInstance()` static method to access selectors via the `Application.Selector` factory.
 
 - **Naming Conventions**:

@@ -42,6 +42,63 @@ Follow this procedure:
 - **Naming Conventions**: All classes MUST follow the project prefix (e.g., `EEORA_`).
 - **Interfaces**: All layers MUST be accessed via interfaces to support mock-based unit testing.
 
+### Dependency Resolution and Mocking
+
+**CRITICAL**: Do NOT use constructor injection for factory-managed classes (Services, Domains, Selectors). The AT4DX `Application` factory provides a built-in mechanism for dependency resolution and mocking that makes constructor injection an anti-pattern.
+
+- **Correct Usage**: Always call the static `newInstance()` method directly within the business logic where the dependency is needed.
+
+  ```apex
+  // Correct: Inside a service or action method
+  public void myBusinessLogic() {
+      IAccountsSelector accts = (IAccountsSelector) Application.Selector.newInstance(Account.SObjectType);
+      List<Account> records = accts.selectById(someIds);
+      // ...
+  }
+  ```
+
+- **Incorrect Usage**: Avoid storing factory-managed classes as instance variables or injecting them.
+
+  ```apex
+  // INCORRECT: Do not do this.
+  public class MyService {
+      private final IAccountsSelector accts;
+
+      // Anti-pattern: Do not use constructor injection.
+      public MyService() {
+          this.accts = (IAccountsSelector) Application.Selector.newInstance(Account.SObjectType);
+      }
+
+      @TestVisible
+      private MyService(IAccountsSelector mockSelector) {
+          this.accts = mockSelector;
+      }
+      // ...
+  }
+  ```
+
+- **Testing**: To provide a mock implementation in a unit test, use the `Application` factory's `setMock()` method.
+
+  ```apex
+  // Correct: In a test method
+  @IsTest
+  private static void myTest() {
+      // 1. Create a mock using fflib-apex-mocks
+      fflib_ApexMocks mocks = new fflib_ApexMocks();
+      IAccountsSelector mockSelector = (IAccountsSelector) mocks.mock(IAccountsSelector.class);
+      
+      // 2. Instruct the factory to use the mock
+      Application.Selector.setMock(IAccountsSelector.class, mockSelector);
+
+      // 3. When the service calls Application.Selector.newInstance(...), it will receive the mock
+      MyService service = new MyService();
+      service.myBusinessLogic();
+
+      // ...
+  }
+  ```
+
+
 ### Project-Specific vs. Universal Components
 
 A fundamental principle of this architecture is the separation of concerns between project-specific code and shared, universal components (often from dependency packages like `universal-common`).

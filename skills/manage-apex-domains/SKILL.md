@@ -13,6 +13,7 @@ This skill manages the "Domain" layer for an SObject, including both the core cl
 - **Interfaces**: All Domains MUST implement a corresponding interface (e.g., `IAccounts`) which extends `IApplicationSObjectDomain`. This is not optional in an AT4DX project.
 - **Factory Registration**: Domains MUST be registered via `ApplicationFactory_DomainBinding` custom metadata to enable Force-DI resolution.
 - **Access**: Use the `newInstance()` static methods via the `Application.Domain` factory.
+- **Calling Domains**: Always call the domain's static `newInstance()` method directly within your business logic. Do not store domains as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
 - **Trigger Scopes**: All triggers MUST include all 7 scopes (after insert, after update, before insert, before update, after delete, before delete, after undelete).
 - **Injection Pattern**: Use Domain Process Injection to add logic to existing Domains, especially those in dependency packages (like `universal-common`).
 
