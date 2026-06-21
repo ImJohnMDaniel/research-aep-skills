@@ -1,14 +1,83 @@
 const fs = require('fs');
 const path = require('path');
+const CWD = process.cwd();
+
+function parseArgs(args) {
+    const result = { _: [] };
+    for (let i = 0; i < args.length; i++) {
+        if (args[i].startsWith('--')) {
+            const key = args[i].substring(2);
+            const value = (i + 1 < args.length && !args[i+1].startsWith('--')) ? args[i+1] : true;
+            result[key] = value;
+            if (value !== true) i++;
+        } else {
+            result._.push(args[i]);
+        }
+    }
+    return result;
+}
 
 function main() {
-    const args = process.argv.slice(2);
+    const rawArgs = process.argv.slice(2);
+    const args = parseArgs(rawArgs);
+    const command = args._[0];
+
+    try {
+        if (command === 'create_apex_class') {
+            handleCreateApexClass(args);
+            console.log(JSON.stringify({ success: true, path: args.path }, null, 2));
+        } else {
+            // Fallback to original manifest logic
+            handleManifest(rawArgs);
+        }
+    } catch (e) {
+        console.error(JSON.stringify({ success: false, error: e.message, stack: e.stack }, null, 2));
+        process.exit(1);
+    }
+}
+
+function handleCreateApexClass(args) {
+    const { path: filePath, body } = args;
+    if (!filePath || !body) {
+        throw new Error("Missing required arguments: --path and --body are required for create_apex_class");
+    }
+
+    // 1. Get API Version from sfdx-project.json at the project root (CWD)
+    const projectJsonPath = path.join(CWD, 'sfdx-project.json');
+    if (!fs.existsSync(projectJsonPath)) {
+        throw new Error(`sfdx-project.json not found at: ${projectJsonPath}`);
+    }
+    const projectConfig = JSON.parse(fs.readFileSync(projectJsonPath, 'utf8'));
+    const apiVersion = projectConfig.sourceApiVersion;
+    if (!apiVersion) {
+        throw new Error('sourceApiVersion not found in sfdx-project.json');
+    }
+
+    // 2. Create directory if it doesn't exist
+    const fullPath = path.join(CWD, filePath);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+
+    // 3. Create .cls file
+    fs.writeFileSync(fullPath, body);
+
+    // 4. Create .cls-meta.xml file
+    const metaXmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>${apiVersion}</apiVersion>
+    <status>Active</status>
+</ApexClass>
+`;
+    const metaXmlPath = fullPath + '-meta.xml';
+    fs.writeFileSync(metaXmlPath, metaXmlContent);
+}
+
+
+function handleManifest(args) {
     if (args.length === 0) {
         console.error('Error: Missing JSON manifest argument.');
         process.exit(1);
     }
     
-    // Join all args and try to parse the full string
     const jsonString = args.join(' ');
 
     let manifest;
@@ -26,7 +95,7 @@ function main() {
         try {
             switch (op.action) {
                 case 'create':
-                    handleCreate(op);
+                    handleCreateFromTemplate(op);
                     results.success.push(`Created: ${op.name}`);
                     break;
                 case 'register':
@@ -56,14 +125,15 @@ function findTemplate(templateName) {
     for (const folder of assetFolders) {
         const extensions = ['.cls', '.trigger', '.xml'];
         for (const ext of extensions) {
-            const fullPath = path.join(folder, `${templateName}Template${ext}`);
+            // The script runs from the workspace root, but the templates are relative to the skill directory
+            const fullPath = path.join(__dirname, '..', '..', folder, `${templateName}Template${ext}`);
             if (fs.existsSync(fullPath)) return fullPath;
         }
     }
     throw new Error(`Template not found: ${templateName}`);
 }
 
-function handleCreate(op) {
+function handleCreateFromTemplate(op) {
     const templatePath = findTemplate(op.template);
     let content = fs.readFileSync(templatePath, 'utf8');
 
@@ -72,6 +142,7 @@ function handleCreate(op) {
     });
 
     // Determine output path based on type (heuristic)
+    // This path is relative to the CWD, which is the project root
     const outputPath = templatePath.endsWith('.xml') 
         ? path.join('force-app/main/default/objects', `${op.name}.xml`)
         : path.join('force-app/main/default/classes', `${op.name}.cls`);
