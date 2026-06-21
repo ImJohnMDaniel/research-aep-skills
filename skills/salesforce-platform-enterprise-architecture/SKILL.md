@@ -9,6 +9,14 @@ This skill provides the architectural framework and procedural guidance for impl
 
 When this skill is active, you must analyze and provide recommendations that align with the principles of the Apex Enterprise Patterns. Your first step is to check the project's configuration to tailor your advice.
 
+### **Core Philosophy: Architectural Purity**
+This skill and its associated skills (`manage-apex-domains`, `manage-apex-selectors`) MUST enforce and favor **architectural purity** over pragmatic shortcuts or developer convenience. All generated code and recommendations must adhere to the strictest interpretation of the Apex Enterprise Patterns.
+
+**Primary Mandate: One Selector Per SObject**
+- Every SObject, without exception, must have its own dedicated Selector class and interface.
+- This includes objects that are tightly coupled by a master-detail or lookup relationship, as well as auxiliary objects like `__Share`, `__History`, and `__ChangeEvent`.
+- Do NOT combine queries for different SObjects into a single Selector class, even if their relationship is cohesive. For example, queries for `MyObject__c` belong in `MyObjectSelector`, and queries for `MyObject__Share` belong in `MyObjectShareSelector`.
+
 ### **Step 0: Situational Analysis & Context Gathering (Mandatory)**
 
 Before modifying any Apex class, the agent MUST perform the following pre-flight checks to ensure a complete understanding of the class's context and purpose.
