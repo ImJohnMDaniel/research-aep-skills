@@ -40,7 +40,7 @@ function getPlural(name) {
         return baseName + "Shares";
     }
 
-    return pluralBase + suffix;
+    return pluralBase;
 }
 
 function sanitizeName(name) {
@@ -124,7 +124,7 @@ async function run() {
         const apiVersion = sfdxProject.sourceApiVersion || '67.0'; // Default to a recent API version if not found
 
         const baseSanitized = sanitizeName(sObjectName, appPrefix);
-        const pluralSanitized = getPlural(baseSanitized);
+        let pluralSanitized = getPlural(baseSanitized);
 
         if (pluralSanitized.startsWith(appPrefix + '_')) {
             pluralSanitized = pluralSanitized.substring(appPrefix.length + 1);
