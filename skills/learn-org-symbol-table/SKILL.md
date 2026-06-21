@@ -13,18 +13,36 @@ This skill automates the discovery of Apex class structures (methods, variables,
 2.  **Fetch Symbols:** Retrieves the `SymbolTable` from the org for the selected classes.
 3.  **Local Storage:** Stores the symbol tables as JSON files in `.gemini/org-symbols/<OrgID>/`.
 
+## Best Practices for Efficiency
+
+To avoid excessive load times and token consumption, **always default to the most specific search possible.** Broad, non-specific searches can be extremely slow and costly. Follow this workflow:
+
+1.  **Direct Lookup First:** Always start by searching for the exact, full class name you expect to find.
+2.  **Narrow Wildcard Second:** If the direct lookup fails, use a wildcard (`--pattern`) that is as specific as possible (e.g., `"Namespace_*ObjectName*"`).
+3.  **Avoid Broad Wildcards:** Using a broad wildcard like `"Namespace_*"` or the `--all` flag should be a last resort only.
+
 ## Usage
 
 To run the learning process for specific classes:
 
+**1. Direct Lookup (Preferred)**
 ```bash
-# Fetch symbols for specific classes
+# Fetch symbols for one or more specific, known classes
 node ./scripts/learn_symbols.cjs ClassName1 ClassName2
+```
 
-# Fetch symbols using a pattern
+**2. Targeted Pattern Search (Use if direct lookup fails)**
+```bash
+# Fetch symbols using a narrow, specific pattern
+node ./scripts/learn_symbols.cjs --pattern "UCMN_*Users*"
+```
+
+**3. Broad Search (Avoid if Possible)**
+```bash
+# Fetch symbols using a broad pattern (Can be very slow)
 node ./scripts/learn_symbols.cjs --pattern "UCMN_*"
 
-# Fetch all missing symbols (Warning: Slow)
+# Fetch all missing symbols from the org (Extremely slow, use with caution)
 node ./scripts/learn_symbols.cjs --all
 ```
 

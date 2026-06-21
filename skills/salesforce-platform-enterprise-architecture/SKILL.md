@@ -51,6 +51,27 @@ A fundamental principle of this architecture is the separation of concerns betwe
 
 **CRITICAL**: Before creating a new Domain or Selector for a standard or external SObject, you **MUST** use the `learn-org-symbol-table` skill to find and utilize the existing component (e.g., `UCMN_UsersSelector`). Creating a duplicate layer for a non-project SObject is a critical architectural violation.
 
+### Selector Discovery Workflow
+
+To efficiently and safely discover dependency selectors (like `UCMN_UsersSelector`), you MUST follow this sequence:
+
+1.  **Direct Name Search (Hypothesize)**: First, deduce the most likely selector name based on conventions (e.g., `UCMN_` + Plural SObject Name + `Selector`). Use `learn-org-symbol-table` with this exact name.
+    ```bash
+    # Correct first step
+    node ./scripts/learn_symbols.cjs UCMN_UsersSelector
+    ```
+2.  **Targeted Pattern Search (Broaden)**: If the direct search fails, broaden the search *slightly* with a targeted pattern that includes the SObject name.
+    ```bash
+    # Correct second step if the first fails
+    node ./scripts/learn_symbols.cjs --pattern "UCMN_*Users*"
+    ```
+3.  **Broad Pattern Search (Last Resort)**: Only if both targeted searches fail, resort to a broader pattern. This is highly inefficient and should be avoided.
+    ```bash
+    # Incorrect: Do not do this unless absolutely necessary
+    node ./scripts/learn_symbols.cjs --pattern "UCMN_*"
+    ```
+
+
 ## Workflows
 
 ### 0. Batch Operations (Mandatory)
