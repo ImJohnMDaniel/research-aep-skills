@@ -9,6 +9,22 @@ This skill provides the architectural framework and procedural guidance for impl
 
 When this skill is active, you must analyze and provide recommendations that align with the principles of the Apex Enterprise Patterns. Your first step is to check the project's configuration to tailor your advice.
 
+### **Step 0: Situational Analysis & Context Gathering (Mandatory)**
+
+Before modifying any Apex class, the agent MUST perform the following pre-flight checks to ensure a complete understanding of the class's context and purpose.
+
+**A. Verify File Contents:**
+   - Use `read_file` on the target Apex class.
+   - **Crucially, if the file read fails, you MUST STOP, investigate the file path, and resolve the issue before proceeding.** Do not, under any circumstances, assume the file's contents.
+
+**B. Analyze the Class Signature:**
+   - Once the file is read, parse the class declaration line (e.g., `public class MyClass extends ParentClass implements IMyInterface`).
+   - Identify the parent class and all implemented interfaces.
+
+**C. Investigate Unknown Dependencies:**
+   - If the parent class or any interfaces are not standard system types (like `Object` or `Queueable`), you **MUST** use the `learn-org-symbol-table` skill to fetch their definitions.
+   - This step is critical for understanding the methods and properties the target class inherits or must implement. The API of the parent class dictates the rules for the child class.
+
 Follow this procedure:
   
    1.  **Verify Project Dependencies:**
@@ -41,6 +57,17 @@ Follow this procedure:
 - **Dependency Injection**: Use the `Application` factory (Force-DI) to instantiate layers.
 - **Naming Conventions**: All classes MUST follow the project prefix (e.g., `EEORA_`).
 - **Interfaces**: All layers MUST be accessed via interfaces to support mock-based unit testing.
+
+### Common Pitfalls & Agent Anti-Patterns
+
+To ensure safe and accurate execution, avoid the following common mistakes:
+
+-   **Anti-Pattern:** Assuming the contents or purpose of a class based on its name.
+    -   **Correction:** Always read the file first (`read_file`).
+-   **Anti-Pattern:** Ignoring `extends` or `implements` keywords in a class signature.
+    -   **Correction:** Always investigate unknown parent classes and interfaces using `learn-org-symbol-table`. Their structure is critical context for your task.
+-   **Anti-Pattern:** Proceeding with a plan after a file read operation fails.
+    -   **Correction:** A failed read indicates a fundamental misunderstanding of the file system. Stop and debug the path.
 
 ### Dependency Resolution and Mocking
 
