@@ -13,17 +13,49 @@ if (!sObjectName) {
 }
 
 function getPlural(name) {
-    if (name.endsWith("y")) return name.slice(0, -1) + "ies";
-    if (name.endsWith("s") || name.endsWith("sh") || name.endsWith("ch") || name.endsWith("x") || name.endsWith("z")) return name + "es";
-    return name + "s";
+    // Correctly handle standard suffixes before pluralizing
+    const suffixes = ["__c", "__pc", "__mdt", "__e", "__Share", "__History", "__ChangeEvent"];
+    let baseName = name;
+    let suffix = "";
+
+    for (const s of suffixes) {
+        if (name.endsWith(s)) {
+            baseName = name.slice(0, -s.length);
+            suffix = s;
+            break;
+        }
+    }
+
+    let pluralBase;
+    if (baseName.endsWith("y")) {
+        pluralBase = baseName.slice(0, -1) + "ies";
+    } else if (baseName.endsWith("s") || baseName.endsWith("sh") || baseName.endsWith("ch") || baseName.endsWith("x") || baseName.endsWith("z")) {
+        pluralBase = baseName + "es";
+    } else {
+        pluralBase = baseName + "s";
+    }
+
+    // Special handling for __Share which becomes Shares
+    if (suffix === "__Share") {
+        return baseName + "Shares";
+    }
+
+    return pluralBase + suffix;
 }
 
-function sanitizeName(name, prefix) {
-    let sanitized = name.replace(/__c|__pc/gi, "");
-    if (prefix && sanitized.startsWith(prefix + "_")) {
-        sanitized = sanitized.substring(prefix.length + 1);
+function sanitizeName(name) {
+    // No longer need to remove suffixes here as getPlural handles them
+    return name;
+}
+
+function validateIdentifier(name) {
+    if (name.includes("__")) {
+        throw new Error(`Generated name "${name}" is invalid because it contains a double underscore. Please check the script's naming logic.`);
     }
-    return sanitized;
+    if (name.length > 40) {
+        // This is a separate check from enforceLimit, more of a hard stop
+        throw new Error(`Generated name "${name}" exceeds the 40-character limit for Apex class names.`);
+    }
 }
 
 function enforceLimit(name, suffix = "") {
@@ -101,6 +133,11 @@ async function run() {
         const interfaceName = enforceLimit(`${appPrefix}_I${pluralSanitized}Selector`);
         const testClassName = enforceLimit(`${appPrefix}_${pluralSanitized}Selector`, "Test");
         const bindingFileName = `ApplicationFactory_SelectorBinding.${appPrefix}_${baseSanitized}.md-meta.xml`;
+
+        // Validate all generated names before proceeding
+        validateIdentifier(className);
+        validateIdentifier(interfaceName);
+        validateIdentifier(testClassName);
 
         const paths = {
             selector: path.join(defaultDir, "main", "classes", "selectors", `${className}.cls`),
