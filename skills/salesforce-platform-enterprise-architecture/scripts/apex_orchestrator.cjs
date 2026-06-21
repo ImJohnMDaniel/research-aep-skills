@@ -37,9 +37,20 @@ function main() {
 }
 
 function handleCreateApexClass(args) {
-    const { path: filePath, body } = args;
-    if (!filePath || !body) {
-        throw new Error("Missing required arguments: --path and --body are required for create_apex_class");
+    const { path: filePath, body, type, sobject } = args;
+    if (!filePath || !body || !type ) {
+        throw new Error("Missing required arguments: --path, --body, and --type are required for create_apex_class");
+    }
+
+    // ARCHITECTURAL GUARDRAIL: Prevent creating selectors/domains for standard SObjects
+    if (type === 'Selector' || type === 'Domain') {
+        if (!sobject) {
+            throw new Error(`--sobject is required when creating a ${type}`);
+        }
+        // Heuristic: If the SObject name doesn't contain '__', it's a standard object.
+        if (sobject.indexOf('__') === -1) {
+            throw new Error(`ARCHITECTURAL VIOLATION: You attempted to create a ${type} for the standard SObject '${sobject}'. This is not allowed. You must first use 'learn-org-symbol-table' to find an existing component from a dependency package and then use the appropriate injection pattern if needed. Aborting.`);
+        }
     }
 
     // 1. Get API Version from sfdx-project.json at the project root (CWD)
