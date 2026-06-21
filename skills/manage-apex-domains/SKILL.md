@@ -10,7 +10,7 @@ This skill manages the "Domain" layer for an SObject, including both the core cl
 ## Architectural Mandates
 
 - **Inheritance**: All Domain classes MUST inherit from `ApplicationSObjectDomain`.
-- **Interfaces**: All Domains MUST implement a corresponding interface (e.g., `IAccounts`) which extends `IApplicationSObjectDomain`.
+- **Interfaces**: All Domains MUST implement a corresponding interface (e.g., `IAccounts`) which extends `IApplicationSObjectDomain`. This is not optional in an AT4DX project.
 - **Factory Registration**: Domains MUST be registered via `ApplicationFactory_DomainBinding` custom metadata to enable Force-DI resolution.
 - **Access**: Use the `newInstance()` static methods via the `Application.Domain` factory.
 - **Trigger Scopes**: All triggers MUST include all 7 scopes (after insert, after update, before insert, before update, after delete, before delete, after undelete).
@@ -23,14 +23,20 @@ This skill manages the "Domain" layer for an SObject, including both the core cl
 
 ## Workflows
 
-**SObject Type Analysis (Pre-Check)**
+**0. Dependency Check (Pre-Check)**
+
+Before creating or refactoring a domain, the agent MUST inspect `sfdx-project.json` for project dependencies:
+-   **If `at4dx` is a dependency:** You **MUST** generate both the concrete domain class and its corresponding interface (extending `IApplicationSObjectDomain`). Omitting the interface is a critical architectural violation under `AT4DX`.
+-   **If `at4dx` is NOT a dependency:** The interface is still considered mandatory for the Domain layer according to core fflib patterns.
+
+**1. SObject Type Analysis (Pre-Check)**
 
 Before proceeding with any Domain creation or update, the agent MUST first analyze the SObject API name:
 
--   **If the SObject has the project prefix (e.g., `EEORA_MyObject__c`):** Proceed to "1. Core Domain Management" to create/update a project-specific Domain.
+-   **If the SObject has the project prefix (e.g., `EEORA_MyObject__c`):** Proceed to "2. Core Domain Management" to create/update a project-specific Domain.
 -   **If the SObject is Standard (`User`, `Account`) or from another package (`OtherPrefix__Object__c`):** **STOP.** Do not create a new Domain. The Domain is assumed to exist in a dependency package. Use the `learn-org-symbol-table` skill to discover the API for the existing domain (e.g., `UCMN_Accounts`) and use that in your implementation. This skill should only be used for project-specific SObjects.
 
-### 1. Core Domain Management
+### 2. Core Domain Management
 Generates or surgically updates the Domain class, Interface, Trigger, and Unit Test.
 
 1.  **Validation:** Checks if the SObject exists in the local project's metadata.
@@ -52,13 +58,13 @@ Example:
 node ./scripts/create_domain.cjs Account EEORA
 ```
 
-### 2. Domain Process Injection (Modular Extension)
+### 3. Domain Process Injection (Modular Extension)
 Automates the creation of modular Criteria or Action classes and their Metadata bindings to inject logic into an existing Domain flow.
 - **Usage**:
   ```bash
   node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> [Operation] [Order]
   ```
-- **Types**: `Criteria`, `CriteriaWithExistingRecs`, `Action`, `ActionWithExistingRecs`, `QueueableAction`.
+- **Types**: `Criteria`, `CriteriaWithExistingRecs`, `Action`, `ActionWithExistingRecs`, `QueueableAction`.      
 - **Asynchronicity**: For async steps, set `ExecuteAsynchronous__c = true` and use `QueueableAction`.
 
 ## Resources

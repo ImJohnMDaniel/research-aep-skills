@@ -10,7 +10,7 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 ## Architectural Mandates
 
 - **Inheritance**: All Selector classes MUST inherit from `ApplicationSObjectSelector`.
-- **Interfaces**: All Selectors MUST implement a corresponding interface (e.g., `IAccountsSelector`) which extends `IApplicationSObjectSelector`.
+- **Interfaces**: All Selectors MUST implement a corresponding interface (e.g., `IAccountsSelector`) which extends `IApplicationSObjectSelector` when `at4dx` is present in the project's dependencies. If `at4dx` is not present, custom interfaces are optional but recommended.
 - **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
 - **Access**: Use the `newInstance()` static method to access selectors via the `Application.Selector` factory.
 
@@ -20,21 +20,27 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 
 ## Workflow
 
+**0. Dependency Check (Pre-Check)**
+
+Before creating or refactoring a selector, the agent MUST inspect `sfdx-project.json` for project dependencies:
+-   **If `at4dx` is a dependency:** You **MUST** generate both the concrete selector class and its corresponding interface (extending `IApplicationSObjectSelector`). Omitting the interface is a critical architectural violation under `AT4DX`.
+-   **If `at4dx` is NOT a dependency:** The interface is optional (Class-Based approach is allowed to reduce boilerplate), though still recommended if dynamic binding is needed.
+
 **1. SObject Type Analysis (Pre-Check)**
 
 Before proceeding, the agent MUST first analyze the SObject API name:
 
 -   **If the SObject has the project prefix (e.g., `EEORA_MyObject__c`):** Proceed to the next step to create a new, project-specific Selector.
--   **If the SObject is Standard (`User`, `Account`) or from another package (`OtherPrefix__Object__c`):** **STOP.** Do not create a new Selector. The Selector is assumed to exist in a dependency package. Use the `learn-org-symbol-table` skill to discover the API for the existing selector (e.g., `UCMN_AccountsSelector`) and use that in your implementation. This skill should only be used for project-specific SObjects.
+-   **If the SObject is Standard (`User`, `Account`) or from another package (`OtherPrefix__Object__c`):** **STOP.** Do not create a new Selector. The Selector is assumed to exist in a dependency package. Use the `learn-org-symbol-table` skill to discover the API for the existing selector (e.g., `UCMN_AccountsSelector`) and use that in your implementation. This skill should only be used for project-specific SObjects.     
 
-1.  **Field List Population**: 
-    - Before creating or updating a selector, the agent MUST use the `learn-org-metadata` skill to retrieve the SObject's field list.
-    - **Filter**: Exclude all fields with `LongTextArea` or `RichTextArea` data types (`textarea` type with `htmlFormatted: true` or large length) to prevent heap size issues.
-    - **Verification**: If the filtered list contains more than **50 fields** AND the selector class is part of the **current project**, the agent MUST verify with the user via `ask_user` if they wish to include all fields. If the selector is part of a **dependency project** (not in the local source), ignore the 50-field verification and include the fields as needed (or as directed).
-2.  **Creation / Update**: Generates or surgically updates the Selector class, Interface, and Unit Test.
-3.  **Binding**: Creates a custom metadata record in `selectorBindings`.
+**2. Field List Population**:
+- Before creating or updating a selector, the agent MUST use the `learn-org-metadata` skill to retrieve the SObject's field list.
+- **Filter**: Exclude all fields with `LongTextArea` or `RichTextArea` data types (`textarea` type with `htmlFormatted: true` or large length) to prevent heap size issues.
+- **Verification**: If the filtered list contains more than **50 fields** AND the selector class is part of the **current project**, the agent MUST verify with the user via `ask_user` if they wish to include all fields. If the selector is part of a **dependency project** (not in the local source), ignore the 50-field verification and include the fields as needed (or as directed).
+**3. Creation / Update**: Generates or surgically updates the Selector class, Interface, and Unit Test.
+**4. Binding**: Creates a custom metadata record in `selectorBindings`.
 ...
-4.  **Deployment**: Automatically deploys the artifacts to the org.
+**5. Deployment**: Automatically deploys the artifacts to the org.
 
 ### Adding Custom Query Methods
 

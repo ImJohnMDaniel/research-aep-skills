@@ -16,9 +16,11 @@ Follow this procedure:
   
    2.  **Determine Advisory Path based on Verification:**
   
-       *   **PATH A: Dependencies ARE PRESENT**
-           *   The project is configured for the full fflib/AT4DX framework.
-           *   Proceed with the user's request, ensuring all analysis, recommendations, and generated code strictly utilize the library's base classes (e.g., `ApplicationSObjectSelector`, `fflib_SObjectDomain`). Your recommendations should enforce the correct use of installed framework.
+       *   **PATH A: AT4DX Dependencies ARE PRESENT**
+           *   **CRITICAL ARCHITECTURAL MANDATE:** This project uses the strict **AT4DX** framework. All layers (**Service**, **Domain**, and **Selector**) **MUST** be implemented with corresponding interfaces (`IService`, `IDomain`, `ISelector`). This is not optional.
+           *   **When creating a Selector, you MUST also create and implement its `I...Selector` interface.**
+           *   Refer to `references/at4dx-patterns.md` for the exact implementation details.
+           *   Utilize the `manage-apex-selectors` skill to ensure compliance.
 
        *   **PATH B: Dependencies ARE ABSENT**
            *   The project does not have the fflib libraries installed. Proceed with the user's request by providing **established Salesforce architectural advice** based on the *principles* of the Enterprise Patterns (e.g., Separation of Concerns, Bulkification, Layering).
