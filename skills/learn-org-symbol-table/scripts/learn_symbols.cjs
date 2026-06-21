@@ -79,10 +79,10 @@ async function run() {
         if (classesToQuery.length === 0) return;
 
         // 4. Create storage directory
-        const projectTempDir = process.env.GEMINI_PROJECT_TEMP_DIR;
-        const storageDir = projectTempDir
-            ? path.join(projectTempDir, 'org-symbols', orgId)
-            : path.join('.gemini', 'org-symbols', orgId);
+        const projectName = path.basename(process.cwd());
+        const tempBaseDir = path.join(require('os').homedir(), '.gemini', 'tmp', projectName);
+        const storageDir = path.join(tempBaseDir, 'org-symbols', orgId);
+
         if (!fs.existsSync(storageDir)) {
             fs.mkdirSync(storageDir, { recursive: true });
         }
