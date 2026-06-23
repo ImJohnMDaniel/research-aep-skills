@@ -34,7 +34,34 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
   - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
   - **Interface**: `{Prefix}_I{PluralSObjectName}Selector` (e.g., `EEORA_IAccommRequestsSelector`)
 
-## Workflow
+# Mandatory Development Workflow
+
+**CRITICAL:** Before writing any code, you MUST follow this workflow. Failure to do so will result in compilation and deployment errors.
+
+### Step 1: Deduce Selector Class Existence
+
+Before creating a selector class, you MUST deduce whether the selector is managed locally by this project or by an external dependency package.
+
+#### Scenario A: Standard SObjects (e.g., `User`, `Account`)
+1.  **Deduction:** Standard SObject selectors are assumed to be managed by the foundational dependency package (`universal-common`) and will be prefixed with `UCMN_` and suffixed with `Selector` (e.g., `UCMN_UsersSelector`, `UCMN_AccountsSelector`).
+2.  **Verification:** Use the `learn-org-symbol-table` skill to search for the expected class name:
+    ```bash
+    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_UsersSelector
+    ```
+3.  **Path:** If the script successfully retrieves the symbol table, the selector **exists in a dependency**. You **MUST NOT** create a new selector locally. Instead, use the **Extending Selectors via Injection** pattern to invoke your custom query.
+
+#### Scenario B: Custom SObjects (e.g., `Prefix_MyObject__c`)
+1.  **Deduction:** Analyze the prefix of the SObject API name.
+    *   If the prefix matches this project's prefix (`EEORA`), the SObject is managed by this project. You may proceed to **Core Selector Management** to create or update the selector locally.
+    *   If the prefix is **different** (e.g., `UCMN_`), the SObject is managed by a dependency package.
+2.  **Verification:** For external custom SObjects, deduce the expected selector name using that external prefix (e.g., `UCMN_MyObjectsSelector`) and verify its existence in the org using the `learn-org-symbol-table` skill:
+    ```bash
+    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_MyObjectsSelector
+    ```
+3.  **Path:** If the selector is external, you **MUST NOT** create it locally. Use the **Extending Selectors via Injection** pattern to invoke your custom query.
+
+## Core Selector Management
+*Use this path ONLY if the deduction workflow in Step 1 determines the selector is managed locally by this project.*
 
 **0. Dependency Check (Pre-Check)**
 
@@ -42,21 +69,13 @@ Before creating or refactoring a selector, the agent MUST inspect `sfdx-project.
 -   **If `at4dx` is a dependency:** You **MUST** generate both the concrete selector class and its corresponding interface (extending `IApplicationSObjectSelector`). Omitting the interface is a critical architectural violation under `AT4DX`.
 -   **If `at4dx` is NOT a dependency:** The interface is optional (Class-Based approach is allowed to reduce boilerplate), though still recommended if dynamic binding is needed.
 
-**1. SObject Type Analysis (Pre-Check)**
-
-Before proceeding, the agent MUST first analyze the SObject API name:
-
--   **If the SObject has the project prefix (e.g., `EEORA_MyObject__c`):** Proceed to the next step to create a new, project-specific Selector.
--   **If the SObject is Standard (`User`, `Account`) or from another package (`OtherPrefix__Object__c`):** **STOP.** Do not create a new Selector. The Selector is assumed to exist in a dependency package. Use the `learn-org-symbol-table` skill to discover the API for the existing selector (e.g., `UCMN_AccountsSelector`) and use that in your implementation. This skill should only be used for project-specific SObjects.     
-
-**2. Field List Population**:
+**1. Field List Population**:
 - Before creating or updating a selector, the agent MUST use the `learn-org-metadata` skill to retrieve the SObject's field list.
 - **Filter**: Exclude all fields with `LongTextArea` or `RichTextArea` data types (`textarea` type with `htmlFormatted: true` or large length) to prevent heap size issues.
 - **Verification**: If the filtered list contains more than **50 fields** AND the selector class is part of the **current project**, the agent MUST verify with the user via `ask_user` if they wish to include all fields. If the selector is part of a **dependency project** (not in the local source), ignore the 50-field verification and include the fields as needed (or as directed).
-**3. Creation / Update**: Generates or surgically updates the Selector class, Interface, and Unit Test.
-**4. Binding**: Creates a custom metadata record in `selectorBindings`.
-...
-**5. Deployment**: Automatically deploys the artifacts to the org.
+**2. Creation / Update**: Generates or surgically updates the Selector class, Interface, and Unit Test.
+**3. Binding**: Creates a custom metadata record in `selectorBindings`.
+**4. Deployment**: Automatically deploys the artifacts to the org.
 
 ## Workflow: Extending Selectors via Injection
 

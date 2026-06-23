@@ -18,38 +18,35 @@ There is no room for deviation. All analysis, code generation, and recommendatio
 
 This skill manages the "Domain" layer for an SObject, including both the core class structure and the **Domain Process Injection** pattern for modular extension, following the AT4DX architectural standard.
 
-## Architectural Mandates
+## Mandatory Development Workflow
 
-- **Inheritance**: All Domain classes MUST inherit from `ApplicationSObjectDomain`.
-- **Interfaces**: All Domains MUST implement a corresponding interface (e.g., `IAccounts`) which extends `IApplicationSObjectDomain`. This is not optional in an AT4DX project.
-- **Factory Registration**: Domains MUST be registered via `ApplicationFactory_DomainBinding` custom metadata to enable Force-DI resolution.
-- **Access**: Use the `newInstance()` static methods via the `Application.Domain` factory.
-- **Calling Domains**: Always call the domain's static `newInstance()` method directly within your business logic. Do not store domains as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
-- **Trigger Scopes**: All triggers MUST include all 7 scopes (after insert, after update, before insert, before update, after delete, before delete, after undelete).
-- **Injection Pattern**: Use Domain Process Injection to add logic to existing Domains, especially those in dependency packages (like `universal-common`).
-- **One Domain, One SObject**: A Domain class is strictly responsible for the business logic of a single SObject. It MUST NOT contain logic for other SObjects. To interact with other records, it must invoke their respective Domain or Service layers. For example, when an `Opportunity` is closed, its Domain class (`Opportunities`) should not directly create an `Order` record. Instead, it should call an `OrdersService` to handle the order creation process, thereby correctly separating the concerns.
+**CRITICAL:** Before evaluating any logic related to the Domain layer or before writing any code related to the Domain layer, you MUST follow this workflow. Failure to do so will result in compilation and deployment errors.
 
-- **Naming Conventions**:
-  - **Domain Class**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
-  - **Interface**: `{Prefix}_I{PluralSObjectName}` (e.g., `EEORA_IAccommRequests`)
-  - **Trigger**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
+### Step 1: Deduce Domain Class Existence
 
-## Workflows
+Before creating a domain class or deciding to interact with any domain logic, you MUST deduce whether the domain for the particular SObject is managed locally by this project or by an external dependency package.
 
-**0. Dependency Check (Pre-Check)**
+#### Scenario A: Standard SObjects (e.g., `User`, `Account`)
+1.  **Deduction:** Standard SObject domains are assumed to be managed by the foundational dependency package (`universal-common`) and will be prefixed with `UCMN_` (e.g., `UCMN_Users`, `UCMN_Accounts`).
+2.  **Verification:** Use the `learn-org-symbol-table` skill to search for the expected class name:
+    ```bash
+    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_Users
+    ```
+3.  **Path:** If the script successfully retrieves the symbol table, the domain **exists in a dependency**. You **MUST NOT** create a new domain locally. Instead, use the **Domain Process Injection** pattern to extend it.
 
-Before creating or refactoring a domain, the agent MUST inspect `sfdx-project.json` for project dependencies:
--   **If `at4dx` is a dependency:** You **MUST** generate both the concrete domain class and its corresponding interface (extending `IApplicationSObjectDomain`). Omitting the interface is a critical architectural violation under `AT4DX`.
--   **If `at4dx` is NOT a dependency:** The interface is still considered mandatory for the Domain layer according to core fflib patterns.
+#### Scenario B: Custom SObjects (e.g., `Prefix_MyObject__c`)
+1.  **Deduction:** Analyze the prefix of the SObject API name.
+    *   If the prefix matches this project's prefix, the SObject is managed by this project. You may proceed to **Core Domain Management** to create or update the domain locally.
+    *   If the prefix is **different** (e.g., `UCMN_`), the SObject is managed by a dependency package.
+2.  **Verification:** For external custom SObjects, deduce the expected domain name using that external prefix (e.g., `UCMN_MyObjects`) and verify its existence in the org using the `learn-org-symbol-table` skill:
+    ```bash
+    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_MyObjects
+    ```
+3.  **Path:** If the domain is external, you **MUST NOT** create it locally. Use the **Domain Process Injection** pattern to extend it.
 
-**1. SObject Type Analysis (Pre-Check)**
+## Core Domain Management
+*Use this path ONLY if the deduction workflow in Step 1 determines the domain is managed locally by this project.*
 
-Before proceeding with any Domain creation or update, the agent MUST first analyze the SObject API name:
-
--   **If the SObject has the project prefix (e.g., `EEORA_MyObject__c`):** Proceed to "2. Core Domain Management" to create/update a project-specific Domain.
--   **If the SObject is Standard (`User`, `Account`) or from another package (`OtherPrefix__Object__c`):** **STOP.** Do not create a new Domain. The Domain is assumed to exist in a dependency package. Use the `learn-org-symbol-table` skill to discover the API for the existing domain (e.g., `UCMN_Accounts`) and use that in your implementation. This skill should only be used for project-specific SObjects.
-
-### 2. Core Domain Management
 Generates or surgically updates the Domain class, Interface, Trigger, and Unit Test.
 
 1.  **Validation:** Checks if the SObject exists in the local project's metadata.
@@ -58,6 +55,7 @@ Generates or surgically updates the Domain class, Interface, Trigger, and Unit T
     *   If files exist (Domain, Interface, Trigger, Test), the skill surgically inserts required boilerplate (like `newInstance` methods or `Constructor` inner classes) while **preserving all existing methods and custom logic**.
 3.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}` convention (40-char limit), handling standard/custom objects appropriately.
 4.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
+
 
 - **Usage**:
 To generate or update a domain, run the bundled script:
@@ -68,17 +66,133 @@ To generate or update a domain, run the bundled script:
 
 Example:
 ```bash
-node ./scripts/create_domain.cjs Account EEORA
+node ./scripts/create_domain.cjs MyObject__c EEORA
 ```
 
-### 3. Domain Process Injection (Modular Extension)
-Automates the creation of modular Criteria or Action classes and their Metadata bindings to inject logic into an existing Domain flow.
+## Domain Process Injection (Modular Extension)
+*Use this path to add logic to an **existing** domain discovered in the Pre-flight Check.*
+
+This pattern allows you to add new logic (Actions) to an existing domain trigger flow, often controlled by `Criteria` classes.
+
+### Action
+An `Action` is a class that performs a specific operation. It **must extend the `DomainProcessAbstractAction` class and implement the `IDomainProcessAction` interface.**
+
+**Example (`MyAction.cls`):**
+```apex
+public class MyAction extends DomainProcessAbstractAction implements IDomainProcessAction {
+    public void runInProcess() {
+        if ( this.records == null || this.records.isEmpty() )
+        {
+            return;
+        }
+        // Your logic here...
+    }
+}
+```
+> For a complete, working example, see the file at `references/examples/ExampleAction.cls`.
+
+#### Actions with Existing Records
+For "after update" or "after delete" scenarios, you often need to perform actions on the new records with information from the old ones. In this case, your class **must extend the `DomainProcessAbstractAction` class and implement the `IDomainProcessActionWithExistingRecs` interface**, which extends the base interface with a `setExistingRecords` method.
+
+**Example (`MyUpdateAction.cls`):**
+```apex
+public class MyUpdateAction extends DomainProcessAbstractAction implements IDomainProcessActionWithExistingRecs {
+    public IDomainProcessAction setExistingRecords( Map<Id, SObject> existingRecords )
+    {
+        this.existingRecords = existingRecords;
+        return this;
+    }
+    public override void runInProcess() {
+        if ( this.records == null || this.records.isEmpty() )
+        {
+            return;
+        }
+        // Your logic here...
+    }
+}
+```
+> For a complete, working example, see the file at `references/examples/ExampleActionWithExistingRecs.cls`.
+
+
+### Criteria
+A `Criteria` class is responsible for filtering a list of records and returning only those that meet a specific condition. This is a more powerful and bulk-safe pattern than evaluating records one-by-one.
+
+A Criteria class **must implement the `IDomainProcessCriteria` interface.**
+
+**Example (`MyCriteria.cls`):**
+```apex
+public class MyCriteria implements IDomainProcessCriteria {
+    private List<SObject> recordsToEvaluate;
+
+    public List<SObject> run() {
+        List<SObject> qualifiedRecords = new List<SObject>();
+        for (SObject s : this.recordsToEvaluate) {
+            if (/* your condition is true for s */) {
+                qualifiedRecords.add(s);
+            }
+        }
+        return qualifiedRecords;
+    }
+
+    public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> records) {
+        this.recordsToEvaluate = records;
+        return this;
+    }
+}
+```
+> For a complete, working example, see `references/examples/ExampleCriteria.cls`.
+
+#### Criteria with Existing Records
+For "after update" or "after delete" scenarios, you often need to compare the new records to the old ones. In this case, your class **must implement the `IDomainProcessCriteriaWithExistingRecs` interface**, which extends the base interface with a `setExistingRecords` method.
+
+**Example (`MyUpdateCriteria.cls`):**
+```apex
+public class MyUpdateCriteria implements IDomainProcessCriteriaWithExistingRecs {
+    private List<SObject> recordsToEvaluate;
+    private Map<Id, SObject> existingRecords;
+
+    public List<SObject> run() {
+        // ... filtering logic using this.recordsToEvaluate and this.existingRecords
+    }
+
+    public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> records) {
+        this.recordsToEvaluate = records;
+        return this;
+    }
+
+    public IDomainProcessCriteria setExistingRecords(Map<Id, SObject> existingRecords) {
+        this.existingRecords = existingRecords;
+        return this;
+    }
+}
+```
+> For a complete, working example, see `references/examples/ExampleCriteriaWithExistingRecs.cls`.
+
+### Creating Injections Manually
+If the automated scripts fail, you must create the Apex classes and the `DomainProcessBinding__mdt` metadata records manually. Ensure your metadata files are placed in the correct directory: `.../customMetadata/DomainProcessBinding/<RecordName>.md-meta.xml`.
+
+### Creating Injections with the Script
 - **Usage**:
   ```bash
   node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> [Operation] [Order]
   ```
-- **Types**: `Criteria`, `CriteriaWithExistingRecs`, `Action`, `ActionWithExistingRecs`, `QueueableAction`.      
+- **Types**: `Criteria`, `Action`.
 - **Asynchronicity**: For async steps, set `ExecuteAsynchronous__c = true` and use `QueueableAction`.
+
+## Architectural Mandates
+
+- **Inheritance**: All Domain classes MUST inherit from `ApplicationSObjectDomain`.
+- **Interfaces**: All Domains MUST implement a corresponding interface (e.g., `IAccounts`) which extends `IApplicationSObjectDomain`.
+- **Factory Registration**: Domains MUST be registered via `ApplicationFactory_DomainBinding` custom metadata to enable Force-DI resolution.
+- **Access**: Use the `newInstance()` static methods via the `Application.Domain` factory.
+- **Calling Domains**: Always call the domain's static `newInstance()` method directly within your business logic. Do not store domains as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
+- **Trigger Scopes**: All triggers MUST include all 7 scopes (after insert, after update, before insert, before update, after delete, before delete, after undelete).
+- **Injection Pattern**: Use Domain Process Injection to add logic to existing Domains, especially those in dependency packages (like `universal-common`).
+- **One Domain, One SObject**: A Domain class is strictly responsible for the business logic of a single SObject. It MUST NOT contain logic for other SObjects. To interact with other records, it must invoke their respective Domain or Service layers. For example, when an `Opportunity` is closed, its Domain class (`Opportunities`) should not directly create an `Order` record. Instead, it should call an `OrdersService` to handle the order creation process, thereby correctly separating the concerns.
+- **Naming Conventions**:
+  - **Domain Class**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
+  - **Interface**: `{Prefix}_I{PluralSObjectName}` (e.g., `EEORA_IAccommRequests`)
+  - **Trigger**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
 
 ## Resources
 
@@ -90,5 +204,11 @@ Automates the creation of modular Criteria or Action classes and their Metadata 
 - `DomainTemplate.cls`, `InterfaceTemplate.cls`, `TriggerTemplate.trigger`, `TestTemplate.cls`
 - `CriteriaTemplate.cls`, `CriteriaWithExistingRecsTemplate.cls`
 - `ActionTemplate.cls`, `ActionWithExistingRecsTemplate.cls`
-- `QueueableActionTemplate.cls`
+- `QueueableAction.cls`
 - `BindingTemplate.xml`: Universal template for both Domain and Process bindings.
+
+### references/examples/
+- `ExampleAction.cls`: A reference implementation of a Domain Process Action.
+- `ExampleCriteria.cls`: A reference implementation of a Domain Process Criteria.
+- `ExampleCriteriaWithExistingRecs.cls`: A reference implementation for update/delete criteria.
+- `ExampleActionWithExistingRecs.cls`: A reference implementation for update/delete actions.

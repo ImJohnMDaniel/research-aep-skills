@@ -87,6 +87,12 @@ To ensure safe and accurate execution, avoid the following common mistakes:
     -   **Correction:** Always investigate unknown parent classes and interfaces using `learn-org-symbol-table`. Their structure is critical context for your task.
 -   **Anti-Pattern:** Proceeding with a plan after a file read operation fails.
     -   **Correction:** A failed read indicates a fundamental misunderstanding of the file system. Stop and debug the path.
+-   **Anti-Pattern:** Triggering a full package version creation (`sf package version create`) or package installation to resolve dependency compilation errors during source deployment.
+    -   **Correction:** Packaging is a heavyweight, slow operation that is out of scope for local agent tasks and must be managed exclusively by the existing CI/CD system. If a deployment fails due to missing dependencies (e.g., `Invalid type` or `Variable does not exist` errors), it is almost always due to:
+        1.  **A typo** in an interface or base class name (e.g., using `fflib_ISObjectDomainAction` instead of `IDomainProcessAction`).
+        2.  **Missing symbol table information** leading to incorrect assumptions about class inheritance.
+        3.  **An incorrect local path** or folder structure preventing the compiler from resolving references (e.g. putting custom metadata in `customMetadata/` instead of `customMetadata/DomainProcessBinding/`).
+        Always investigate the correctness of your class signature and local directory structure against the discovered symbol tables rather than attempting a packaging workaround.
 
 ### Dependency Resolution and Mocking
 
