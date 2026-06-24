@@ -214,6 +214,20 @@ public class MyUpdateCriteria implements IDomainProcessCriteriaWithExistingRecs 
 
 #### Criteria are defined configured with domain binding records that adhere to the schema shown in the DomainProcessBinding__mdt custom metadata object.
 
+### CRITICAL: Binding to SObjects with Metadata Relationship Limitations
+The `DomainProcessBinding__mdt` object uses a "Metadata Relationship" field, `RelatedDomainBindingSObject__c`, to link to the SObject's domain definition in `ApplicationFactory_DomainBinding__mdt`. Due to Salesforce platform restrictions, this field type cannot reference certain standard SObjects.
+
+These objects include, but are not limited to:
+- `User`
+- `Task`
+- `ContentVersion`
+- `ContentDocument`
+- `ContentDocumentLink`
+
+When creating a `DomainProcessBinding__mdt` record for one of these SObjects, you **MUST NOT** populate the `RelatedDomainBindingSObject__c` field. Instead, you **MUST** populate the alternate text field, **`RelatedDomainBindingSObjectAlternate__c`**, with the SObject's API name as a string (e.g., `<value xsi:type="xsd:string">User</value>`).
+
+Failure to use the alternate field for these specific SObjects will result in a deployment error.
+
 ### Creating Injections Manually
 If the automated scripts fail, you must create the Apex classes and the `DomainProcessBinding__mdt` metadata records manually. Ensure your metadata files are placed in the correct directory: `.../customMetadata/domainProcessBinding/DomainProcessBinding.<RecordName>.md-meta.xml`.
 
