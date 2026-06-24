@@ -57,6 +57,12 @@ Before modifying any Apex class, the agent MUST perform the following pre-flight
    - If the parent class or any interfaces are not standard system types (like `Object` or `Queueable`), you **MUST** use the `learn-org-symbol-table` skill to fetch their definitions.
    - This step is critical for understanding the methods and properties the target class inherits or must implement. The API of the parent class dictates the rules for the child class.
 
+**E. Mandatory Co-Activation for SObject Logic Analysis**
+   - When a task involves analyzing or modifying **Apex Triggers** or SObject business logic, you **MUST** immediately co-activate the `manage-apex-domains` skill.
+   - When a task involves analyzing or modifying **SOQL queries** or data access patterns, you **MUST** immediately co-activate the `manage-apex-selectors` skill.
+
+A complete and accurate analysis requires the specialized knowledge from these skills from the very beginning of the task, not just during implementation. This is not optional.
+
 Follow this procedure:
   
    1.  **Verify Project Dependencies:**
