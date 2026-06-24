@@ -87,6 +87,14 @@ This custom metadata type is used via the Force-DI dependency injection framewor
 ##### DomainProcessBinding__mdt
 This custom metadata type is used via the Force-DI dependency injection framework to map domain criteria and action classes their specific domain processes.
 
+### CRITICAL: Trigger Syntax
+The `fflib_SObjectDomain.triggerHandler` method is the only acceptable way to invoke domain logic from a trigger. Its syntax is precise and must be followed exactly.
+
+-   **Correct:** `fflib_SObjectDomain.triggerHandler(MyDomainClass.class);`
+-   **INCORRECT:** `fflib_SObjectDomain.triggerHandler(MyObject__c.SObjectType);`
+
+Always refer to the `assets/TriggerTemplate.trigger` in this skill as the absolute source of truth for trigger syntax. Do not generate trigger code from memory.
+
 ## Core Domain Management
 *Use this path ONLY if the deduction workflow in Step 1 determines the domain is managed locally by this project.*
 

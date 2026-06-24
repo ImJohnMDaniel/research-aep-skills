@@ -108,6 +108,10 @@ To ensure safe and accurate execution, avoid the following common mistakes:
     -   **Correction:** A failed read indicates a fundamental misunderstanding of the file system. Stop and debug the path.
 -   **Anti-Pattern:** Triggering a full package version creation (`sf package version create`) or package installation to resolve dependency compilation errors during source deployment.
     -   **Correction:** Packaging is a heavyweight, slow operation that is out of scope for local agent tasks and must be managed exclusively by the existing CI/CD system. 
+-   **Anti-Pattern:** Refactoring a trigger on a standard or external SObject (e.g., `User`, `Account`).
+    -   **Correction:** Triggers on non-project SObjects are almost always redundant violations of the "one trigger per object" rule. The correct action is to recommend the trigger's **deletion** and migrate its logic into a Domain Process Injection that hooks into the official, shared trigger infrastructure. Do not attempt to "fix" or "refactor" a trigger that should not exist.
+-   **Anti-Pattern:** Guessing or assuming the syntax of core framework methods like `fflib_SObjectDomain.triggerHandler`.
+    -   **Correction:** Core framework syntax is non-negotiable. The `fflib_SObjectDomain.triggerHandler()` method requires a `System.Type` parameter (e.g., `MyDomain.class`), **NOT** an `SObjectType`. Before generating trigger code, you **MUST** consult the `TriggerTemplate.trigger` asset in the `manage-apex-domains` skill to ensure 100% correct syntax.
 
 ### Dependency Resolution and Mocking
 
@@ -174,6 +178,8 @@ A fundamental principle of this architecture is the separation of concerns betwe
 -   **Standard & External SObjects**: Standard Salesforce SObjects (`Account`, `User`, etc.) or SObjects from other packages (`OtherPrefix__Object__c`) are considered "universal". You **MUST** assume that their corresponding Apex Enterprise Pattern layers (Domain, Selector) already exist in a shared dependency.
 
 **CRITICAL**: Before creating a new Domain or Selector for a standard or external SObject, you **MUST** use the `learn-org-symbol-table` skill to find and utilize the existing component (e.g., `UCMN_UsersSelector`). Creating a duplicate layer for a non-project SObject is a critical architectural violation.
+
+**CRITICAL WORKFLOW FOR TRIGGERS**: When encountering an Apex Trigger, first determine the ownership of its SObject. If the SObject is standard or from another package, any trigger on it within the current project is considered **illegitimate**. The primary goal is its **removal**, not its refactoring. Migrate its logic into a Domain Process Injection and delete the trigger file.
 
 ### Selector Discovery Workflow
 
