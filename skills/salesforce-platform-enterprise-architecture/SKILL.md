@@ -28,6 +28,15 @@ This skill and its associated skills (`manage-apex-domains`, `manage-apex-select
 - This includes objects that are tightly coupled by a master-detail or lookup relationship, as well as auxiliary objects like `__Share`, `__History`, and `__ChangeEvent`.
 - Do NOT combine queries for different SObjects into a single Selector class, even if their relationship is cohesive. For example, queries for `MyObject__c` belong in `MyObjectSelector`, and queries for `MyObject__Share` belong in `MyObjectShareSelector`.
 
+**Primary Mandate: One Domain Per SObject**
+- Every SObject, without exception, must have its own dedicated Domain class and interface.
+- This includes objects that are tightly coupled by a master-detail or lookup relationship, as well as auxiliary objects like `__Share`, `__History`, and `__ChangeEvent`.
+- Do NOT combine business logic for different SObjects into a single Domain class, even if their relationship is cohesive. For example, business logic for `MyObject__c` belongs in `MyObjects` domain class, and business logic for `MyObject__Share` belongs in `MyObjectShares` domain class.
+
+**Primary Mandate: One Trigger Per SObject**
+- Every SObject tigger should use only one Apex trigger.  
+- Business logic related to Apex trigger/DML operations should be writen into the SObject's Domain class (assuming the SObject is part of the current project) or injected into the SObject's Domain class via **Domain Process Injection**
+
 ### **Step 0: Situational Analysis & Context Gathering (Mandatory)**
 
 Before modifying any Apex class, the agent MUST perform the following pre-flight checks to ensure a complete understanding of the class's context and purpose.
@@ -40,7 +49,11 @@ Before modifying any Apex class, the agent MUST perform the following pre-flight
    - Once the file is read, parse the class declaration line (e.g., `public class MyClass extends ParentClass implements IMyInterface`).
    - Identify the parent class and all implemented interfaces.
 
-**C. Investigate Unknown Dependencies:**
+**C. Determine Current Salesforce API Version (Mandatory):**
+    - Use the sfdx-project.json to understand what the current Salesforce API version is for the project.  
+    - Use that version number for all file creations where an apiVersion is specified (e.g. ApexClass, ApexTrigger, ApexPage, etc.).  **ALWAYS USE THIS API VERSION NUMBER**
+
+**D. Investigate Unknown Dependencies:**
    - If the parent class or any interfaces are not standard system types (like `Object` or `Queueable`), you **MUST** use the `learn-org-symbol-table` skill to fetch their definitions.
    - This step is critical for understanding the methods and properties the target class inherits or must implement. The API of the parent class dictates the rules for the child class.
 
@@ -66,7 +79,7 @@ Follow this procedure:
 ## Core Architectural Layers
 
 1.  **Service Layer**: Encapsulates business processes and orchestration.
-2.  **Domain Layer**: Encapsulates SObject-specific validation, defaults, and business logic. Managed via `manage-apex-domains`.
+2.  **Domain Layer**: Encapsulates SObject-specific validation, defaults, and business logic. Managed via `manage-apex-domains`.  Apex Triggers should use the SObject's associated Domain class for all busines logic.
 3.  **Selector Layer**: Encapsulates SOQL queries, ensuring consistency and security. Managed via `manage-apex-selectors`.
 4.  **Unit of Work**: Manages transactionality and DML orchestration using `IApplicationSObjectUnitOfWork`.
 
@@ -88,11 +101,7 @@ To ensure safe and accurate execution, avoid the following common mistakes:
 -   **Anti-Pattern:** Proceeding with a plan after a file read operation fails.
     -   **Correction:** A failed read indicates a fundamental misunderstanding of the file system. Stop and debug the path.
 -   **Anti-Pattern:** Triggering a full package version creation (`sf package version create`) or package installation to resolve dependency compilation errors during source deployment.
-    -   **Correction:** Packaging is a heavyweight, slow operation that is out of scope for local agent tasks and must be managed exclusively by the existing CI/CD system. If a deployment fails due to missing dependencies (e.g., `Invalid type` or `Variable does not exist` errors), it is almost always due to:
-        1.  **A typo** in an interface or base class name (e.g., using `fflib_ISObjectDomainAction` instead of `IDomainProcessAction`).
-        2.  **Missing symbol table information** leading to incorrect assumptions about class inheritance.
-        3.  **An incorrect local path** or folder structure preventing the compiler from resolving references (e.g. putting custom metadata in `customMetadata/` instead of `customMetadata/DomainProcessBinding/`).
-        Always investigate the correctness of your class signature and local directory structure against the discovered symbol tables rather than attempting a packaging workaround.
+    -   **Correction:** Packaging is a heavyweight, slow operation that is out of scope for local agent tasks and must be managed exclusively by the existing CI/CD system. 
 
 ### Dependency Resolution and Mocking
 

@@ -44,6 +44,49 @@ Before creating a domain class or deciding to interact with any domain logic, yo
     ```
 3.  **Path:** If the domain is external, you **MUST NOT** create it locally. Use the **Domain Process Injection** pattern to extend it.
 
+### Ensure Exact Understanding Of Classes, Interfaces, and Custom Metadata Types From AT4DX Framework Related to Apex Domains
+
+#### Apex Classes
+If you have not done so previously, use the `learn-org-symbol-table` skill and find the SymbolTables for the following Apex classes and review them thoroughly.  These classes are specifically related to AT4DX framework's management of Domain classes.  Note: The AT4DX Framework classes do not have a prefix.  Do not try to add on infer a prefix for these AT4DX classes mentioned here.
+
+##### Core Domain Class from the FFLIB Apex Common Framework
+* `fflib_ISobjectDomain`
+* `fflib_ISObjects`
+* `fflib_IObjects`
+* `fflib_SobjectDomain`
+* `fflib_SObjects`
+* `fflib_Objects`
+
+##### Core Domain Class from the AT4DX Framework
+* `ApplicationSObjectDomain`
+* `IApplicationSObjectDomain`
+* `DomainProcessConstants`
+
+##### Apex Classes Related to Domain Process Actions from the AT4DX Framework
+* `DomainProcessAbstractAction`
+* `IDomainProcessAction`
+* `IDomainProcessActionWithExistingRecs`
+* `IDomainProcessQueueableAction`
+* `IDomainProcessWithParamsAction`
+
+##### Apex Classes Related to Domain Process Criteria from the AT4DX Framework
+* `IDomainProcessCriteria`
+* `IDomainProcessCriteriaWithExistingRecs`
+* `IDomainProcessWithParamsCriteria`
+
+##### Apex Classes Related to the AT4DX Application Domain Factory
+* `Application`
+    * Specifically the inner class Application.Domain
+
+#### Custom Metadata Types
+If you have not done so previously, use the `learn-org-metadat` skill and understand the complete schema for the following Custom Metadata Types and review them thoroughly.  These custom metadata types are specifically related to AT4DX framework's management of Domain classes:
+
+##### ApplicationFactory_DomainBinding__mdt
+This custom metadata type is used via the Force-DI dependency injection framework to map domain classes to their respective SObject and configure how the Application.Domain factory class will manage the domain implementations.
+
+##### DomainProcessBinding__mdt
+This custom metadata type is used via the Force-DI dependency injection framework to map domain criteria and action classes their specific domain processes.
+
 ## Core Domain Management
 *Use this path ONLY if the deduction workflow in Step 1 determines the domain is managed locally by this project.*
 
@@ -113,6 +156,7 @@ public class MyUpdateAction extends DomainProcessAbstractAction implements IDoma
 ```
 > For a complete, working example, see the file at `references/examples/ExampleActionWithExistingRecs.cls`.
 
+#### Actions are defined configured with domain binding records that adhere to the schema shown in the DomainProcessBinding__mdt custom metadata object.
 
 ### Criteria
 A `Criteria` class is responsible for filtering a list of records and returning only those that meet a specific condition. This is a more powerful and bulk-safe pattern than evaluating records one-by-one.
@@ -168,8 +212,10 @@ public class MyUpdateCriteria implements IDomainProcessCriteriaWithExistingRecs 
 ```
 > For a complete, working example, see `references/examples/ExampleCriteriaWithExistingRecs.cls`.
 
+#### Criteria are defined configured with domain binding records that adhere to the schema shown in the DomainProcessBinding__mdt custom metadata object.
+
 ### Creating Injections Manually
-If the automated scripts fail, you must create the Apex classes and the `DomainProcessBinding__mdt` metadata records manually. Ensure your metadata files are placed in the correct directory: `.../customMetadata/DomainProcessBinding/<RecordName>.md-meta.xml`.
+If the automated scripts fail, you must create the Apex classes and the `DomainProcessBinding__mdt` metadata records manually. Ensure your metadata files are placed in the correct directory: `.../customMetadata/domainProcessBinding/DomainProcessBinding.<RecordName>.md-meta.xml`.
 
 ### Creating Injections with the Script
 - **Usage**:
