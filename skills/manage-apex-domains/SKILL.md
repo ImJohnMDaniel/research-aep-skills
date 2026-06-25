@@ -123,104 +123,131 @@ node ./scripts/create_domain.cjs MyObject__c EEORA
 ## Domain Process Injection (Modular Extension)
 *Use this path to add logic to an **existing** domain discovered in the Pre-flight Check.*
 
-This pattern allows you to add new logic (Actions) to an existing domain trigger flow, often controlled by `Criteria` classes.
+This pattern allows you to add modular logic (`Actions`) to an existing domain trigger flow, which can be conditionally executed based on `Criteria` classes. This is the primary mechanism for extending domains that exist in dependency packages.
 
-### Action
-An `Action` is a class that performs a specific operation. It **must extend the `DomainProcessAbstractAction` class and implement the `IDomainProcessAction` interface.**
+### The Core Concept: Bindings
 
-**Example (`MyAction.cls`):**
-```apex
-public class MyAction extends DomainProcessAbstractAction implements IDomainProcessAction {
-    public void runInProcess() {
-        if ( this.records == null || this.records.isEmpty() )
-        {
-            return;
-        }
-        // Your logic here...
-    }
-}
+The key to Domain Process Injection is the `DomainProcessBinding__mdt` custom metadata type. This is how you tell the framework what logic to run, when to run it, and in what order.
+
+**CRITICAL PRINCIPLES:**
+1.  **One Record per Component:** Every single `Criteria` class and every single `Action` class requires its own, separate `DomainProcessBinding__mdt` record. You **cannot** combine them.
+2.  **Explicit Typing:** Each binding record MUST be explicitly typed as either `Criteria` or `Action` using the `<field>Type__c</field>` value in the metadata file.
+3.  **No Direct Linking:** There is **NO** field to directly link an Action to a Criteria in the metadata. The relationship is managed entirely by the framework based on the `OrderOfExecution__c` field.
+
+### How it Works: Grouping and Ordering with `OrderOfExecution__c`
+
+The `OrderOfExecution__c` field is the most important concept to understand. It controls both the grouping of logic into a "Domain Process" and the sequence of execution within that process.
+
+-   **The Integer Part (e.g., `10` in `10.1`): Groups Bindings into a Process.**
+    All `Criteria` and `Action` bindings that share the same integer are considered part of the **same Domain Process**. You can have multiple, independent processes for the same trigger event (e.g., a process at `10.x`, another at `20.x`) by using different integers. Each process starts with the full record set from the trigger and filters it independently.
+
+-   **The Decimal Part (e.g., `.1` in `10.1`): Orders Execution within a Process.**
+    Within a single process (all bindings with the same integer), the framework executes components in ascending order of their full `OrderOfExecution__c` value. The flow is always:
+    1.  All `Criteria` for the process are executed, in order.
+    2.  The records that pass *all* criteria are then passed to the actions.
+    3.  All `Actions` for the process are executed, in order, on the filtered subset of records.
+
+### Creating Injections with the `create_injection.cjs` Script
+
+The recommended way to create the injection components is to use the included script. It's a two-stage process:
+
+1.  **Stage 1: Class Generation:** Run the script from the command line with the component details.
+    ```bash
+    # Usage: node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type>
+    # Type must be 'Criteria' or 'Action'
+    
+    node ./scripts/create_injection.cjs EEORA_UserActiveCriteria User Criteria
+    ```
+    The script will create the boilerplate Apex class file in the correct directory.
+
+2.  **Stage 2: Interactive Binding Configuration:** After creating the class, the script will prompt you for the information needed to create the binding metadata.
+    - **Domain Process Group:** The integer used to group this component with others (e.g., `10`).
+    - **Execution Order:** The script will automatically suggest the next available decimal for the process group.
+    - **Trigger Operation(s):** A comma-separated list of events (e.g., `After_Insert,After_Update`).
+
+The script then generates the correct `DomainProcessBinding__mdt` file(s) for you, handling naming, ordering, and all other required fields automatically.
+
+### Example Binding Metadata (For Reference)
+
+The interactive script will generate the necessary files for you. The following XML examples are provided as a reference so you can understand the underlying metadata structure that the script creates.
+
+**Example: A Criteria Binding Record**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>User Activation Criteria (Update)</label>
+    <protected>false</protected>
+    <values>
+        <field>ClassToInject__c</field>
+        <value xsi:type="xsd:string">EEORA_UserActiveCriteria</value> <!-- The Criteria class -->
+    </values>
+    <values>
+        <field>IsActive__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>OrderOfExecution__c</field>
+        <value xsi:type="xsd:double">10.1</value> <!-- Process 10, Step 1 -->
+    </values>
+    <values>
+        <field>ProcessContext__c</field>
+        <value xsi:type="xsd:string">TriggerExecution</value>
+    </values>
+    <values>
+        <field>RelatedDomainBindingSObjectAlternate__c</field>
+        <value xsi:type="xsd:string">User</value>
+    </values>
+    <values>
+        <field>TriggerOperation__c</field>
+        <value xsi:type="xsd:string">After_Update</value>
+    </values>
+    <values>
+        <field>Type__c</field>
+        <value xsi:type="xsd:string">Criteria</value> <!-- This is a Criteria binding -->
+    </values>
+    ...
+</CustomMetadata>
 ```
-> For a complete, working example, see the file at `references/examples/ExampleAction.cls`.
 
-#### Actions with Existing Records
-For "after update" or "after delete" scenarios, you often need to perform actions on the new records with information from the old ones. In this case, your class **must extend the `DomainProcessAbstractAction` class and implement the `IDomainProcessActionWithExistingRecs` interface**, which extends the base interface with a `setExistingRecords` method.
-
-**Example (`MyUpdateAction.cls`):**
-```apex
-public class MyUpdateAction extends DomainProcessAbstractAction implements IDomainProcessActionWithExistingRecs {
-    public IDomainProcessAction setExistingRecords( Map<Id, SObject> existingRecords )
-    {
-        this.existingRecords = existingRecords;
-        return this;
-    }
-    public override void runInProcess() {
-        if ( this.records == null || this.records.isEmpty() )
-        {
-            return;
-        }
-        // Your logic here...
-    }
-}
+**Example: An Action Binding Record for the Same Process**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>User Backfill Action (Update)</label>
+    <protected>false</protected>
+    <values>
+        <field>ClassToInject__c</field>
+        <value xsi:type="xsd:string">EEORA_UserBklAction</value> <!-- The Action class -->
+    </values>
+    <values>
+        <field>IsActive__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>OrderOfExecution__c</field>
+        <value xsi:type="xsd:double">10.2</value> <!-- Process 10, Step 2 -->
+    </values>
+    <values>
+        <field>ProcessContext__c</field>
+        <value xsi:type="xsd:string">TriggerExecution</value>
+    </values>
+    <values>
+        <field>RelatedDomainBindingSObjectAlternate__c</field>
+        <value xsi:type="xsd:string">User</value>
+    </values>
+    <values>
+        <field>TriggerOperation__c</field>
+        <value xsi:type="xsd:string">After_Update</value>
+    </values>
+    <values>
+        <field>Type__c</field>
+        <value xsi:type="xsd:string">Action</value> <!-- This is an Action binding -->
+    </values>
+    ...
+</CustomMetadata>
 ```
-> For a complete, working example, see the file at `references/examples/ExampleActionWithExistingRecs.cls`.
+This configuration correctly tells the framework: "For `After_Update` on `User`, run Process 10. In this process, first evaluate `EEORA_UserActiveCriteria`. On the records that pass, evaluate `EEORA_UserBklAction`."
 
-#### Actions are defined configured with domain binding records that adhere to the schema shown in the DomainProcessBinding__mdt custom metadata object.
-
-### Criteria
-A `Criteria` class is responsible for filtering a list of records and returning only those that meet a specific condition. This is a more powerful and bulk-safe pattern than evaluating records one-by-one.
-
-A Criteria class **must implement the `IDomainProcessCriteria` interface.**
-
-**Example (`MyCriteria.cls`):**
-```apex
-public class MyCriteria implements IDomainProcessCriteria {
-    private List<SObject> recordsToEvaluate;
-
-    public List<SObject> run() {
-        List<SObject> qualifiedRecords = new List<SObject>();
-        for (SObject s : this.recordsToEvaluate) {
-            if (/* your condition is true for s */) {
-                qualifiedRecords.add(s);
-            }
-        }
-        return qualifiedRecords;
-    }
-
-    public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> records) {
-        this.recordsToEvaluate = records;
-        return this;
-    }
-}
-```
-> For a complete, working example, see `references/examples/ExampleCriteria.cls`.
-
-#### Criteria with Existing Records
-For "after update" or "after delete" scenarios, you often need to compare the new records to the old ones. In this case, your class **must implement the `IDomainProcessCriteriaWithExistingRecs` interface**, which extends the base interface with a `setExistingRecords` method.
-
-**Example (`MyUpdateCriteria.cls`):**
-```apex
-public class MyUpdateCriteria implements IDomainProcessCriteriaWithExistingRecs {
-    private List<SObject> recordsToEvaluate;
-    private Map<Id, SObject> existingRecords;
-
-    public List<SObject> run() {
-        // ... filtering logic using this.recordsToEvaluate and this.existingRecords
-    }
-
-    public IDomainProcessCriteria setRecordsToEvaluate(List<SObject> records) {
-        this.recordsToEvaluate = records;
-        return this;
-    }
-
-    public IDomainProcessCriteria setExistingRecords(Map<Id, SObject> existingRecords) {
-        this.existingRecords = existingRecords;
-        return this;
-    }
-}
-```
-> For a complete, working example, see `references/examples/ExampleCriteriaWithExistingRecs.cls`.
-
-#### Criteria are defined configured with domain binding records that adhere to the schema shown in the DomainProcessBinding__mdt custom metadata object.
 
 ### CRITICAL: Binding to SObjects with Metadata Relationship Limitations
 The `DomainProcessBinding__mdt` object uses a "Metadata Relationship" field, `RelatedDomainBindingSObject__c`, to link to the SObject's domain definition in `ApplicationFactory_DomainBinding__mdt`. Due to Salesforce platform restrictions, this field type cannot reference certain standard SObjects.
@@ -232,20 +259,7 @@ These objects include, but are not limited to:
 - `ContentDocument`
 - `ContentDocumentLink`
 
-When creating a `DomainProcessBinding__mdt` record for one of these SObjects, you **MUST NOT** populate the `RelatedDomainBindingSObject__c` field. Instead, you **MUST** populate the alternate text field, **`RelatedDomainBindingSObjectAlternate__c`**, with the SObject's API name as a string (e.g., `<value xsi:type="xsd:string">User</value>`).
-
-Failure to use the alternate field for these specific SObjects will result in a deployment error.
-
-### Creating Injections Manually
-If the automated scripts fail, you must create the Apex classes and the `DomainProcessBinding__mdt` metadata records manually. Ensure your metadata files are placed in the correct directory: `.../customMetadata/domainProcessBinding/DomainProcessBinding.<RecordName>.md-meta.xml`.
-
-### Creating Injections with the Script
-- **Usage**:
-  ```bash
-  node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> [Operation] [Order]
-  ```
-- **Types**: `Criteria`, `Action`.
-- **Asynchronicity**: For async steps, set `ExecuteAsynchronous__c = true` and use `QueueableAction`.
+When creating a `DomainProcessBinding__mdt` record for one of these SObjects, you **MUST NOT** populate the `RelatedDomainBindingSObject__c` field. Instead, you **MUST** populate the alternate text field, **`RelatedDomainBindingSObjectAlternate__c`**, with the SObject's API name as a string (e.g., `<value xsi:type="xsd:string">User</value>`). The script handles this for you.
 
 ## Architectural Mandates
 

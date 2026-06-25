@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-    <label>{{Label}}</label>
+    <label>REPLACE_ME</label>
     <protected>false</protected>
     <values>
         <field>ClassToInject__c</field>
-        <value xsi:type="xsd:string">{{ClassName}}</value>
+        <value xsi:type="xsd:string">REPLACE_ME</value>
     </values>
     <values>
         <field>Description__c</field>
-        <value xsi:type="xsd:string">{{Description}}</value>
+        <value xsi:type="xsd:string">REPLACE_ME</value>
     </values>
     <values>
         <field>ExecuteAsynchronous__c</field>
-        <value xsi:type="xsd:boolean">{{ExecuteAsync}}</value>
+        <value xsi:type="xsd:boolean">false</value>
     </values>
     <values>
         <field>IsActive__c</field>
@@ -24,7 +24,7 @@
     </values>
     <values>
         <field>OrderOfExecution__c</field>
-        <value xsi:type="xsd:double">{{Order}}</value>
+        <value xsi:type="xsd:double">REPLACE_ME</value>
     </values>
     <values>
         <field>ProcessContext__c</field>
@@ -36,14 +36,14 @@
     </values>
     <values>
         <field>RelatedDomainBindingSObjectAlternate__c</field>
-        <value xsi:type="xsd:string">{{SObjectName}}</value>
+        <value xsi:type="xsd:string">REPLACE_ME</value>
     </values>
     <values>
         <field>TriggerOperation__c</field>
-        <value xsi:type="xsd:string">{{Operation}}</value>
+        <value xsi:type="xsd:string">REPLACE_ME</value>
     </values>
     <values>
         <field>Type__c</field>
-        <value xsi:type="xsd:string">{{Type}}</value>
+        <value xsi:type="xsd:string">Action</value>
     </values>
 </CustomMetadata>
