@@ -37,25 +37,21 @@ This skill and its associated skills (`manage-apex-domains`, `manage-apex-select
 - Every SObject tigger should use only one Apex trigger.  
 - Business logic related to Apex trigger/DML operations should be writen into the SObject's Domain class (assuming the SObject is part of the current project) or injected into the SObject's Domain class via **Domain Process Injection**
 
-### **Step 0: Situational Analysis & Context Gathering (Mandatory)**
+### **Mandatory Pre-flight Checklist**
 
-Before modifying any Apex class, the agent MUST perform the following pre-flight checks to ensure a complete understanding of the class's context and purpose.
+Before proposing to modify any Apex code, you MUST perform and explicitly state the results of the following steps in order. This is not optional.
 
-**A. Verify File Contents:**
-   - Use `read_file` on the target Apex class.
-   - **Crucially, if the file read fails, you MUST STOP, investigate the file path, and resolve the issue before proceeding.** Do not, under any circumstances, assume the file's contents.
+1.  **State Target File:** Announce the full path to the Apex class or trigger you intend to analyze or modify. Read its contents using `read_file`. If the file does not exist or cannot be read, you MUST stop and report the error.
 
-**B. Analyze the Class Signature:**
-   - Once the file is read, parse the class declaration line (e.g., `public class MyClass extends ParentClass implements IMyInterface`).
-   - Identify the parent class and all implemented interfaces.
+2.  **State API Version:** Read the `sfdx-project.json` file. Announce the `sourceApiVersion` you will use for any new metadata files.
 
-**C. Determine Current Salesforce API Version (Mandatory):**
-    - Use the sfdx-project.json to understand what the current Salesforce API version is for the project.  
-    - Use that version number for all file creations where an apiVersion is specified (e.g. ApexClass, ApexTrigger, ApexPage, etc.).  **ALWAYS USE THIS API VERSION NUMBER**
+3.  **State Dependencies:** Analyze the class signature from step 1. Announce its parent `extends` class and all `implements` interfaces.
 
-**D. Investigate Unknown Dependencies:**
-   - If the parent class or any interfaces are not standard system types (like `Object` or `Queueable`), you **MUST** use the `learn-org-symbol-table` skill to fetch their definitions.
-   - This step is critical for understanding the methods and properties the target class inherits or must implement. The API of the parent class dictates the rules for the child class.
+4.  **Announce Verification Plan:** For each non-system dependency identified in step 3 (e.g., anything not from the `System` namespace), you MUST announce your plan to verify it. State: "I will now verify the methods for the following dependencies: [List of Dependencies]".
+
+5.  **Execute Verification:** Use the `learn-org-symbol-table` skill to get the symbol table for each dependency announced in the previous step.
+
+6.  **Confirm Readiness:** After successfully completing all the steps above, you MUST explicitly state: "**Pre-flight checklist complete. All dependencies have been verified.**" You may only proceed with generating a plan or writing code *after* making this confirmation statement.
 
 **E. Mandatory Co-Activation for SObject Logic Analysis**
    - When a task involves analyzing or modifying **Apex Triggers** or SObject business logic, you **MUST** immediately co-activate the `manage-apex-domains` skill.

@@ -5,8 +5,20 @@ const { execSync } = require("child_process");
 const sObjectName = process.argv[2];
 const appPrefix = process.argv[3] || "EEORA";
 
+// Parse custom flags
+const args = process.argv.slice(4);
+const flags = {};
+for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--')) {
+        const key = arg.slice(2);
+        flags[key] = true;
+    }
+}
+
 if (!sObjectName) {
     console.error("Error: SObject name is required.");
+    console.error("Usage: node create_domain.cjs <SObjectName> [AppPrefix] [--no-deploy]");
     process.exit(1);
 }
 
@@ -85,7 +97,9 @@ function updateFile(filePath, content, templateIfMissing) {
     if (filePath.endsWith(".cls") || filePath.endsWith(".trigger")) {
         const lastBraceIndex = existingContent.lastIndexOf("}");
         if (lastBraceIndex !== -1) {
-            const updated = existingContent.substring(0, lastBraceIndex) + "\n" + content + "\n" + existingContent.substring(lastBraceIndex);
+            const updated = existingContent.substring(0, lastBraceIndex) + "
+" + content + "
+" + existingContent.substring(lastBraceIndex);
             fs.writeFileSync(filePath, updated);
             console.log(` - Updated: ${filePath}`);
             return true;
@@ -96,9 +110,25 @@ function updateFile(filePath, content, templateIfMissing) {
 
 async function run() {
     try {
+        console.log("--- Step 1: Live Verification of Base Dependencies ---");
+        const learnScriptPath = path.join(__dirname, '../../learn-org-symbol-table/scripts/learn_symbols.cjs');
+
+        try {
+            // As per our discussion, this step utilizes the learn-org-symbol-table skill to ensure
+            // the base AT4DX interfaces exist in the org before we try to implement them.
+            console.log("Verifying IApplicationSObjectDomain...");
+            execSync(`node ${learnScriptPath} IApplicationSObjectDomain`, { stdio: 'pipe' });
+            console.log("✔ Verified base dependency IApplicationSObjectDomain.");
+        } catch (e) {
+            console.error('CRITICAL: Failed to verify base dependency IApplicationSObjectDomain. Ensure the AT4DX and fflib-apex-common packages are installed in the target org.');
+            console.error(e.stderr ? e.stderr.toString() : e.toString());
+            process.exit(1);
+        }
+        console.log("--- Verification Complete ---");
+
         const sfdxProject = JSON.parse(fs.readFileSync("sfdx-project.json", "utf8"));
         const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
-        const apiVersion = sfdxProject.sourceApiVersion || '67.0';
+        const apiVersion = sfdxProject.sourceApiVersion;
 
         const baseSanitized = sanitizeName(sObjectName, appPrefix);
         let pluralSanitized = getPlural(baseSanitized);
@@ -131,21 +161,91 @@ async function run() {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         });
 
-        const newInstanceBlock = `    public static ${interfaceName} newInstance(List<${sObjectName}> records)\n    {\n        return (${interfaceName}) Application.Domain.newInstance(records);\n    }\n\n    public static ${interfaceName} newInstance(Set<Id> recordIds)\n    {\n        return (${interfaceName}) Application.Domain.newInstance(recordIds);\n    }`;
-        const constructorClassBlock = `    public class Constructor\n        implements fflib_SObjectDomain.IConstructable\n    {\n        public fflib_SObjectDomain construct(List<SObject> sObjectList)\n        { \n            return new ${className}(sObjectList);\n        }\n    }`;
+        const newInstanceBlock = `    public static ${interfaceName} newInstance(List<${sObjectName}> records)
+    {
+        return (${interfaceName}) Application.Domain.newInstance(records);
+    }
+
+    public static ${interfaceName} newInstance(Set<Id> recordIds)
+    {
+        return (${interfaceName}) Application.Domain.newInstance(recordIds);
+    }`;
+        const constructorClassBlock = `    public class Constructor
+        implements fflib_SObjectDomain.IConstructable
+    {
+        public fflib_SObjectDomain construct(List<SObject> sObjectList)
+        { 
+            return new ${className}(sObjectList);
+        }
+    }`;
         const triggerHandlerBlock = `    fflib_SObjectDomain.triggerHandler(${className}.class);`;
 
         const supportsMR = isSupportedByMetadataRelationship(sObjectName);
         const bindingSObjectValue = supportsMR ? `<value xsi:type="xsd:string">${sObjectName}</value>` : `<value xsi:nil="true"/>`;
         const bindingSObjectAlternateValue = supportsMR ? `<value xsi:nil="true"/>` : `<value xsi:type="xsd:string">${sObjectName}</value>`;
 
-        const domainTemplate = `public inherited sharing class ${className}\n    extends ApplicationSObjectDomain\n    implements ${interfaceName}\n{\n${newInstanceBlock}\n\n    public ${className}()\n    {\n        super( new List<${sObjectName}>() );\n    }\n\n    public ${className}(List<${sObjectName}> records)\n    {\n        super(records);\n    }\n\n${constructorClassBlock}\n}`;
-        const interfaceTemplate = `public interface ${interfaceName}\n    extends IApplicationSObjectDomain\n{\n    \n}`;
-        const testTemplate = `@IsTest\nprivate class ${testClassName}\n{\n    @IsTest \n    private static void testNewInstanceMethod()\n    {\n        Id recordId = fflib_IDGenerator.generate( ${sObjectName}.SObjectType );\n        ${sObjectName} record = new ${sObjectName}( Id = recordId );\n        Test.startTest();\n        ${className}.newInstance( new List<${sObjectName}>{ record } );\n        ${className}.newInstance( new Set<Id>{ recordId } );\n        Test.stopTest();\n    }\n}`;
-        const triggerTemplate = `trigger ${triggerName} on ${sObjectName} \n    (after delete, after insert, after update, after undelete, before delete, before insert, before update) \n{\n${triggerHandlerBlock}\n}`;
-        const bindingTemplate = `<?xml version="1.0" encoding="UTF-8"?>\n<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n    <label>${className}</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObject__c</field>\n        ${bindingSObjectValue}\n    </values>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        ${bindingSObjectAlternateValue}\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type="xsd:string">${className}.Constructor</value>\n    </values>\n</CustomMetadata>`;
+        const domainTemplate = `public inherited sharing class ${className}
+    extends ApplicationSObjectDomain
+    implements ${interfaceName}
+{
+${newInstanceBlock}
 
-        console.log(`Processing domain artifacts for ${sObjectName}:`);
+    public ${className}()
+    {
+        super( new List<${sObjectName}>() );
+    }
+
+    public ${className}(List<${sObjectName}> records)
+    {
+        super(records);
+    }
+
+${constructorClassBlock}
+}`;
+        const interfaceTemplate = `public interface ${interfaceName}
+    extends IApplicationSObjectDomain
+{
+    
+}`;
+        const testTemplate = `@IsTest
+private class ${testClassName}
+{
+    @IsTest 
+    private static void testNewInstanceMethod()
+    {
+        Id recordId = fflib_IDGenerator.generate( ${sObjectName}.SObjectType );
+        ${sObjectName} record = new ${sObjectName}( Id = recordId );
+        Test.startTest();
+        ${className}.newInstance( new List<${sObjectName}>{ record } );
+        ${className}.newInstance( new Set<Id>{ recordId } );
+        Test.stopTest();
+    }
+}`;
+        const triggerTemplate = `trigger ${triggerName} on ${sObjectName} 
+    (after delete, after insert, after update, after undelete, before delete, before insert, before update) 
+{
+${triggerHandlerBlock}
+}`;
+        const bindingTemplate = `<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>${className}</label>
+    <protected>false</protected>
+    <values>
+        <field>BindingSObject__c</field>
+        ${bindingSObjectValue}
+    </values>
+    <values>
+        <field>BindingSObjectAlternate__c</field>
+        ${bindingSObjectAlternateValue}
+    </values>
+    <values>
+        <field>To__c</field>
+        <value xsi:type="xsd:string">${className}.Constructor</value>
+    </values>
+</CustomMetadata>`;
+
+        console.log(`
+--- Step 2: Creating/Updating Domain Artifacts for ${sObjectName} ---`);
 
         let changed = false;
         changed |= updateFile(paths.domain, newInstanceBlock, domainTemplate);
@@ -165,13 +265,24 @@ async function run() {
             const metaPath = paths[key] + "-meta.xml";
             if (!fs.existsSync(metaPath)) {
                 const type = key === "trigger" ? "ApexTrigger" : "ApexClass";
-                fs.writeFileSync(metaPath, `<?xml version="1.0" encoding="UTF-8"?>\n<${type} xmlns="http://soap.sforce.com/2006/04/metadata">\n    <apiVersion>${apiVersion}</apiVersion>\n    <status>Active</status>\n</${type}>`);
+                fs.writeFileSync(metaPath, `<?xml version="1.0" encoding="UTF-8"?>
+<${type} xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>${apiVersion}</apiVersion>
+    <status>Active</status>
+</${type}>`);
             }
         });
 
-        if (changed) {
-            console.log("\nDeploying changes...");
+        if (changed && !flags['no-deploy']) {
+            console.log("
+Deploying changes...");
             execSync("sf project deploy start", { stdio: "inherit" });
+        } else if (changed) {
+            console.log("
+Skipping deployment due to --no-deploy flag.");
+        } else {
+            console.log("
+No changes detected. Skipping deployment.");
         }
     } catch (error) {
         console.error("Error:", error.message);

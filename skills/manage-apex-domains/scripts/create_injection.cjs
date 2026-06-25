@@ -9,7 +9,7 @@ const sObjectName = process.argv[3];
 const type = process.argv[4]; // Criteria | Action
 
 if (!componentName || !sObjectName || !type) {
-    console.error("Usage: node create_injection.cjs <ComponentName> <SObjectName> <Type>");
+    console.error("Usage: node create_injection.cjs <ComponentName> <SObjectName> <Type> [flags]");
     console.error("Type must be 'Criteria' or 'Action'");
     process.exit(1);
 }
@@ -22,23 +22,48 @@ if (!isCriteria && !isAction) {
     process.exit(1);
 }
 
+// Parse custom flags
+const args = process.argv.slice(5);
+const flags = {};
+for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--')) {
+        const key = arg.slice(2);
+        const nextArg = args[i + 1];
+        if (nextArg && !nextArg.startsWith('--')) {
+            flags[key] = nextArg;
+            i++;
+        } else {
+            flags[key] = true;
+        }
+    }
+}
+
+const isNonInteractive = !!(flags.group && flags.ops);
+
+// Validate non-interactive flags if supplied
+if (isNonInteractive) {
+    const context = flags.context || "TriggerExecution";
+    if (context !== "TriggerExecution" && context !== "DomainMethodExecution") {
+        console.error("Error: --context must be either 'TriggerExecution' or 'DomainMethodExecution'.");
+        process.exit(1);
+    }
+}
 
 // --- Interactive Prompt Setup ---
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
+let rl;
+if (!isNonInteractive) {
+    rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+}
 
 const askQuestion = (query) => new Promise(resolve => rl.question(query, resolve));
-
 
 // --- Main Execution ---
 async function run() {
     try {
-        // --- Stage 1: Generate Apex Class (The "Good" Part) ---
-        console.log(`
---- Stage 1: Creating Apex Class for ${componentName} ---`);
-
         const sfdxProject = JSON.parse(fs.readFileSync("sfdx-project.json", "utf8"));
         const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
         const apiVersion = sfdxProject.sourceApiVersion;
@@ -55,7 +80,39 @@ async function run() {
         if (!fs.existsSync(path.dirname(classPath))) fs.mkdirSync(path.dirname(classPath), { recursive: true });
         if (!fs.existsSync(bindingDir)) fs.mkdirSync(bindingDir, { recursive: true });
 
-        const templateFile = isCriteria ? "CriteriaTemplate.cls" : "ActionTemplate.cls";
+        // Parse trigger operations early for non-interactive mode
+        let triggerOperations = [];
+        if (isNonInteractive) {
+            triggerOperations = flags.ops.split(',').map(op => op.trim()).filter(Boolean);
+            if (triggerOperations.length === 0) {
+                console.error("Error: No trigger operations specified in --ops.");
+                process.exit(1);
+            }
+        }
+
+        // --- Stage 1: Generate Apex Class ---
+        console.log(`\n--- Stage 1: Creating Apex Class for ${componentName} ---`);
+
+        // Select the correct template file
+        let templateFile;
+        if (isCriteria) {
+            const hasUpdateOrDelete = isNonInteractive && triggerOperations.some(op => {
+                const lOp = op.toLowerCase();
+                return lOp.includes('update') || lOp.includes('delete');
+            });
+            templateFile = hasUpdateOrDelete ? "CriteriaWithExistingRecsTemplate.cls" : "CriteriaTemplate.cls";
+        } else {
+            if (flags.async) {
+                templateFile = "QueueableActionTemplate.cls";
+            } else {
+                const hasUpdateOrDelete = isNonInteractive && triggerOperations.some(op => {
+                    const lOp = op.toLowerCase();
+                    return lOp.includes('update') || lOp.includes('delete');
+                });
+                templateFile = hasUpdateOrDelete ? "ActionWithExistingRecsTemplate.cls" : "ActionTemplate.cls";
+            }
+        }
+
         let classContent = fs.readFileSync(path.join(assetsDir, templateFile), "utf8");
         classContent = classContent.replace(/{{ClassName}}/g, componentName).replace(/{{SObjectName}}/g, sObjectName);
         fs.writeFileSync(classPath, classContent);
@@ -67,83 +124,117 @@ async function run() {
 </ApexClass>`;
         fs.writeFileSync(metaPath, classMeta);
 
-        console.log(`✔ Created Class: ${classPath}`);
+        console.log(`✔ Created Class: ${classPath} (using ${templateFile})`);
         console.log(`✔ Created Meta:  ${metaPath}`);
 
-        // --- Stage 2: Interactive Binding Configuration ---
-        console.log(`
---- Stage 2: Create Domain Process Binding ---`);
-        const createBinding = await askQuestion("Do you want to create a DomainProcessBinding metadata record now? (y/n) ");
-        if (createBinding.toLowerCase() !== 'y') {
-            console.log("Skipping binding creation. Exiting.");
-            return;
-        }
+        // --- Stage 2: Binding Configuration ---
+        let processGroup;
+        let finalOrder;
+        let skipBinding = false;
 
-        const processGroup = parseInt(await askQuestion("Enter the Domain Process Group number (e.g., 10, 20): "), 10);
-        if (isNaN(processGroup)) {
-            console.error("Invalid number. Exiting.");
-            return;
-        }
+        if (isNonInteractive) {
+            console.log(`\n--- Stage 2: Creating Domain Process Bindings (Non-Interactive) ---`);
+            processGroup = parseInt(flags.group, 10);
+            if (isNaN(processGroup)) {
+                console.error("Error: --group must be a valid number.");
+                process.exit(1);
+            }
+        } else {
+            console.log(`\n--- Stage 2: Create Domain Process Binding ---`);
+            const createBinding = await askQuestion("Do you want to create a DomainProcessBinding metadata record now? (y/n) ");
+            if (createBinding.toLowerCase() !== 'y') {
+                console.log("Skipping binding creation. Exiting.");
+                skipBinding = true;
+            }
 
-        // Scan for existing execution orders in this group
-        let highestDecimal = 0;
-        const existingBindings = fs.readdirSync(bindingDir);
-        existingBindings.forEach(file => {
-            const content = fs.readFileSync(path.join(bindingDir, file), 'utf8');
-            const orderMatch = content.match(/<field>OrderOfExecution__c<\/field>\s*<value.*>(\d+\.\d+)/);
-            if (orderMatch) {
-                const order = parseFloat(orderMatch[1]);
-                if (Math.floor(order) === processGroup && order > highestDecimal) {
-                    highestDecimal = order;
+            if (!skipBinding) {
+                processGroup = parseInt(await askQuestion("Enter the Domain Process Group number (e.g., 10, 20): "), 10);
+                if (isNaN(processGroup)) {
+                    console.error("Invalid number. Exiting.");
+                    return;
                 }
             }
-        });
-
-        const nextOrder = highestDecimal === 0 ? `${processGroup}.1` : (Math.floor(highestDecimal) + (Math.round((highestDecimal % 1) * 10) / 10) + 0.1).toFixed(1);
-        const finalOrder = await askQuestion(`Suggested execution order is ${nextOrder}. Press Enter to accept or enter a different value: `) || nextOrder;
-
-        const triggerOpsAnswer = await askQuestion("Enter Trigger Operation(s) (comma-separated, e.g., After_Insert,After_Update): ");
-        const triggerOperations = triggerOpsAnswer.split(',').map(op => op.trim()).filter(Boolean);
-        
-        if(triggerOperations.length === 0) {
-            console.log("No trigger operations specified. Exiting.");
-            return;
         }
 
-        const bindingTemplateFile = isCriteria ? "CriteriaBindingTemplate.xml" : "ActionBindingTemplate.xml";
-        let bindingTemplate = fs.readFileSync(path.join(assetsDir, bindingTemplateFile), "utf8");
+        if (!skipBinding) {
+            // Scan for existing execution orders in this group
+            let highestDecimal = 0;
+            if (fs.existsSync(bindingDir)) {
+                const existingBindings = fs.readdirSync(bindingDir);
+                existingBindings.forEach(file => {
+                    const content = fs.readFileSync(path.join(bindingDir, file), 'utf8');
+                    const orderMatch = content.match(/<field>OrderOfExecution__c<\/field>\s*<value.*>(\d+\.\d+)/);
+                    if (orderMatch) {
+                        const order = parseFloat(orderMatch[1]);
+                        if (Math.floor(order) === processGroup && order > highestDecimal) {
+                            highestDecimal = order;
+                        }
+                    }
+                });
+            }
 
-        for (const operation of triggerOperations) {
-            // Generate a safer, shorter name to avoid 40-char limit
-            const bindingName = `${sObjectName}_${componentName}_${operation}`.substring(0, 40);
-            const bindingPath = path.join(bindingDir, `DomainProcessBinding.${bindingName}.md-meta.xml`);
-            
-            let bindingContent = bindingTemplate
-                .replace(/REPLACE_ME/g, bindingName) // Use a single replace for the label
-                .replace(/<field>ClassToInject__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>ClassToInject__c</field>
-        <value xsi:type="xsd:string">${componentName}</value>`)
-                .replace(/<field>Description__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>Description__c</field>
-        <value xsi:type="xsd:string">Domain Process for ${sObjectName} during ${operation}</value>`)
-                .replace(/<field>OrderOfExecution__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>OrderOfExecution__c</field>
-        <value xsi:type="xsd:double">${finalOrder}</value>`)
-                .replace(/<field>RelatedDomainBindingSObjectAlternate__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>RelatedDomainBindingSObjectAlternate__c</field>
-        <value xsi:type="xsd:string">${sObjectName}</value>`)
-                .replace(/<field>TriggerOperation__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>TriggerOperation__c</field>
-        <value xsi:type="xsd:string">${operation}</value>`);
+            const nextOrder = highestDecimal === 0 ? `${processGroup}.1` : (Math.floor(highestDecimal) + (Math.round((highestDecimal % 1) * 10) / 10) + 0.1).toFixed(1);
 
-            fs.writeFileSync(bindingPath, bindingContent);
-            console.log(`✔ Created Binding: ${bindingPath}`);
+            if (isNonInteractive) {
+                finalOrder = flags.order ? parseFloat(flags.order) : parseFloat(nextOrder);
+                if (isNaN(finalOrder)) {
+                    console.error("Error: --order must be a valid number.");
+                    process.exit(1);
+                }
+            } else {
+                finalOrder = await askQuestion(`Suggested execution order is ${nextOrder}. Press Enter to accept or enter a different value: `) || nextOrder;
+                finalOrder = parseFloat(finalOrder);
+
+                const triggerOpsAnswer = await askQuestion("Enter Trigger Operation(s) (comma-separated, e.g., After_Insert,After_Update): ");
+                triggerOperations = triggerOpsAnswer.split(',').map(op => op.trim()).filter(Boolean);
+                
+                if (triggerOperations.length === 0) {
+                    console.log("No trigger operations specified. Exiting.");
+                    return;
+                }
+            }
+
+            const bindingTemplateFile = isCriteria ? "CriteriaBindingTemplate.xml" : "ActionBindingTemplate.xml";
+            let bindingTemplate = fs.readFileSync(path.join(assetsDir, bindingTemplateFile), "utf8");
+
+            const contextValue = flags.context || "TriggerExecution";
+            const descriptionValue = flags.description || `Domain Process for ${sObjectName}`;
+
+            for (const operation of triggerOperations) {
+                // Generate a safer, shorter name to avoid 40-char limit
+                const bindingName = `${sObjectName}_${componentName}_${operation}`.substring(0, 40);
+                const bindingPath = path.join(bindingDir, `DomainProcessBinding.${bindingName}.md-meta.xml`);
+                
+                let bindingContent = bindingTemplate
+                    .replace(/REPLACE_ME/g, bindingName) // Use a single replace for the label
+                    .replace(/<field>ClassToInject__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>ClassToInject__c</field>\n        <value xsi:type="xsd:string">${componentName}</value>`)
+                    .replace(/<field>Description__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>Description__c</field>\n        <value xsi:type="xsd:string">${descriptionValue} during ${operation}</value>`)
+                    .replace(/<field>OrderOfExecution__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>OrderOfExecution__c</field>\n        <value xsi:type="xsd:double">${finalOrder.toFixed(1)}</value>`)
+                    .replace(/<field>RelatedDomainBindingSObjectAlternate__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:type="xsd:string">${sObjectName}</value>`)
+                    .replace(/<field>TriggerOperation__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>TriggerOperation__c</field>\n        <value xsi:type="xsd:string">${operation}</value>`);
+
+                // Dynamic Context Replacement
+                bindingContent = bindingContent.replace(/<field>ProcessContext__c<\/field>\s*<value.*>TriggerExecution<\/value>/, `<field>ProcessContext__c</field>\n        <value xsi:type="xsd:string">${contextValue}</value>`);
+
+                fs.writeFileSync(bindingPath, bindingContent);
+                console.log(`✔ Created Binding: ${bindingPath}`);
+            }
         }
 
-        console.log("
-Deploying all new components...");
-        execSync("sf project deploy start", { stdio: "inherit" });
+        if (!flags['no-deploy']) {
+            console.log("\nDeploying all new components...");
+            execSync("sf project deploy start", { stdio: "inherit" });
+        } else {
+            console.log("\nSkipping deployment as requested by --no-deploy flag.");
+        }
 
     } catch (error) {
         console.error("Error:", error.message);
         process.exit(1);
     } finally {
-        rl.close();
+        if (rl) {
+            rl.close();
+        }
     }
 }
 

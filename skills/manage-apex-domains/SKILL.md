@@ -18,31 +18,20 @@ There is no room for deviation. All analysis, code generation, and recommendatio
 
 This skill manages the "Domain" layer for an SObject, including both the core class structure and the **Domain Process Injection** pattern for modular extension, following the AT4DX architectural standard.
 
-## Mandatory Development Workflow
+## Mandatory Domain Workflow
 
-**CRITICAL:** Before evaluating any logic related to the Domain layer or before writing any code related to the Domain layer, you MUST follow this workflow. Failure to do so will result in compilation and deployment errors.
+**CRITICAL:** Before creating or extending any Domain layer, you MUST follow this workflow to determine if the Domain is managed locally or by a dependency. Failure to do so is a critical architectural violation.
 
-### Step 1: Deduce Domain Class Existence
+1.  **Analyze SObject Prefix:** Examine the API name of the SObject in question.
+    *   **If the prefix matches the project's prefix (e.g., `EEORA_`)**, the SObject is managed locally. Announce: "**[SObject API Name] is a local SObject. I will use `create_domain.cjs` to manage its domain layer.**" You may then proceed to the **Core Domain Management** section.
+    *   **If the prefix is different OR it is a standard SObject (e.g., `User`, `Account`)**, the SObject is managed by an external dependency. Proceed to the next step.
 
-Before creating a domain class or deciding to interact with any domain logic, you MUST deduce whether the domain for the particular SObject is managed locally by this project or by an external dependency package.
-
-#### Scenario A: Standard SObjects (e.g., `User`, `Account`)
-1.  **Deduction:** Standard SObject domains are assumed to be managed by the foundational dependency package (`universal-common`) and will be prefixed with `UCMN_` (e.g., `UCMN_Users`, `UCMN_Accounts`).
-2.  **Verification:** Use the `learn-org-symbol-table` skill to search for the expected class name:
-    ```bash
-    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_Users
-    ```
-3.  **Path:** If the script successfully retrieves the symbol table, the domain **exists in a dependency**. You **MUST NOT** create a new domain locally. Instead, use the **Domain Process Injection** pattern to extend it.
-
-#### Scenario B: Custom SObjects (e.g., `Prefix_MyObject__c`)
-1.  **Deduction:** Analyze the prefix of the SObject API name.
-    *   If the prefix matches this project's prefix, the SObject is managed by this project. You may proceed to **Core Domain Management** to create or update the domain locally.
-    *   If the prefix is **different** (e.g., `UCMN_`), the SObject is managed by a dependency package.
-2.  **Verification:** For external custom SObjects, deduce the expected domain name using that external prefix (e.g., `UCMN_MyObjects`) and verify its existence in the org using the `learn-org-symbol-table` skill:
-    ```bash
-    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_MyObjects
-    ```
-3.  **Path:** If the domain is external, you **MUST NOT** create it locally. Use the **Domain Process Injection** pattern to extend it.
+2.  **Deduce and Verify External Domain:** For external SObjects, you must find the existing domain, not create a new one.
+    *   **Deduce Name:** Hypothesize the domain's class name based on its prefix and plural name (e.g., `UCMN_Users`, `OTHERPREFIX_MyObjects`).
+    *   **Verify with Skill:** Use the `learn-org-symbol-table` skill to search for the hypothesized class name.
+    *   **Announce Finding:**
+        *   If the class is found, announce: "**Verified that the external domain [Verified Class Name] exists. I will use the Domain Process Injection pattern to extend it.**" You may then proceed to the **Domain Process Injection** section.
+        *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local domain for an external SObject.
 
 ### Ensure Exact Understanding Of Classes, Interfaces, and Custom Metadata Types From AT4DX Framework Related to Apex Domains
 
