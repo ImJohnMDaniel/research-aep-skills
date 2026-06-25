@@ -136,25 +136,33 @@ The `OrderOfExecution__c` field is the most important concept to understand. It 
     2.  The records that pass *all* criteria are then passed to the actions.
     3.  All `Actions` for the process are executed, in order, on the filtered subset of records.
 
-### Creating Injections with the `create_injection.cjs` Script
+### Creating Injections with `create_injection.cjs` (Agent Workflow)
 
-The recommended way to create the injection components is to use the included script. It's a two-stage process:
+**CRITICAL:** You MUST execute this script non-interactively by providing all required information via command-line flags. Attempting to run the script without these flags will cause it to enter an interactive mode that you cannot complete.
 
-1.  **Stage 1: Class Generation:** Run the script from the command line with the component details.
+Your workflow is as follows:
+
+1.  **Determine Parameters:** Before execution, you must determine the values for the following parameters:
+    *   `ComponentName`: The name for the new Apex class (e.g., `EEORA_MyNewCriteria`).
+    *   `SObjectName`: The API name of the SObject being targeted (e.g., `User`, `Account`).
+    *   `Type`: The type of injection, either `Criteria` or `Action`.
+    *   `ProcessGroup`: The integer that groups this logic with other injections (e.g., `10`, `20`). You should analyze existing bindings in `sfdx-source/eeora/main/schema/customMetadata/domainProcessBindings/` to choose a logical group number.
+    *   `TriggerOps`: A comma-separated string of the trigger operations this injection applies to (e.g., `"After_Insert,After_Update"`).
+    *   `Order`: The execution order number. You MUST calculate this by finding the highest existing order number within your chosen `ProcessGroup` and incrementing the decimal by 0.1. For example, if the highest existing order is `10.2`, your new order should be `10.3`.
+
+2.  **Construct and Execute Command:** Assemble the final command using the non-interactive flags.
+
+    **Full Command Template:**
     ```bash
-    # Usage: node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type>
-    # Type must be 'Criteria' or 'Action'
-    
-    node ./scripts/create_injection.cjs EEORA_UserActiveCriteria User Criteria
+    node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> --group <ProcessGroup> --ops "<TriggerOps>" --order <Order>
     ```
-    The script will create the boilerplate Apex class file in the correct directory.
 
-2.  **Stage 2: Interactive Binding Configuration:** After creating the class, the script will prompt you for the information needed to create the binding metadata.
-    - **Domain Process Group:** The integer used to group this component with others (e.g., `10`).
-    - **Execution Order:** The script will automatically suggest the next available decimal for the process group.
-    - **Trigger Operation(s):** A comma-separated list of events (e.g., `After_Insert,After_Update`).
-
-The script then generates the correct `DomainProcessBinding__mdt` file(s) for you, handling naming, ordering, and all other required fields automatically.
+    **Example:**
+    ```bash
+    # This command creates a Criteria class and its binding metadata non-interactively.
+    node ./scripts/create_injection.cjs EEORA_UserIsActiveCriteria User Criteria --group 10 --ops "After_Update,After_Insert" --order 10.2
+    ```
+3.  **Verify:** After execution, verify that the new Apex class and the corresponding `DomainProcessBinding__mdt.xml` file(s) have been created in the correct directories.
 
 ### Example Binding Metadata (For Reference)
 

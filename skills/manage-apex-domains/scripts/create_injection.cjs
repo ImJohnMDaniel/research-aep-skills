@@ -41,6 +41,12 @@ for (let i = 0; i < args.length; i++) {
 
 const isNonInteractive = !!(flags.group && flags.ops);
 
+// AGENT SAFETY CHECK: Ensure agent is running in non-interactive mode.
+if (process.env.IS_GEMINI_AGENT === 'true' && !isNonInteractive) {
+    console.error("AGENT_ERROR: This script must be run non-interactively by an agent. Provide all required data using command-line flags (--group, --ops, --order, etc.).");
+    process.exit(1);
+}
+
 // Validate non-interactive flags if supplied
 if (isNonInteractive) {
     const context = flags.context || "TriggerExecution";
@@ -206,7 +212,7 @@ async function run() {
                 const bindingPath = path.join(bindingDir, `DomainProcessBinding.${bindingName}.md-meta.xml`);
                 
                 let bindingContent = bindingTemplate
-                    .replace(/REPLACE_ME/g, bindingName) // Use a single replace for the label
+                    .replace(/<label>REPLACE_ME<\/label>/, `<label>${bindingName}</label>`)
                     .replace(/<field>ClassToInject__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>ClassToInject__c</field>\n        <value xsi:type="xsd:string">${componentName}</value>`)
                     .replace(/<field>Description__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>Description__c</field>\n        <value xsi:type="xsd:string">${descriptionValue} during ${operation}</value>`)
                     .replace(/<field>OrderOfExecution__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>OrderOfExecution__c</field>\n        <value xsi:type="xsd:double">${finalOrder.toFixed(1)}</value>`)
