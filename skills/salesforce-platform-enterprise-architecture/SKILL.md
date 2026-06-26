@@ -108,6 +108,8 @@ To ensure safe and accurate execution, avoid the following common mistakes:
     -   **Correction:** Triggers on non-project SObjects are almost always redundant violations of the "one trigger per object" rule. The correct action is to recommend the trigger's **deletion** and migrate its logic into a Domain Process Injection that hooks into the official, shared trigger infrastructure. Do not attempt to "fix" or "refactor" a trigger that should not exist.
 -   **Anti-Pattern:** Guessing or assuming the syntax of core framework methods like `fflib_SObjectDomain.triggerHandler`.
     -   **Correction:** Core framework syntax is non-negotiable. The `fflib_SObjectDomain.triggerHandler()` method requires a `System.Type` parameter (e.g., `MyDomain.class`), **NOT** an `SObjectType`. Before generating trigger code, you **MUST** consult the `TriggerTemplate.trigger` asset in the `manage-apex-domains` skill to ensure 100% correct syntax.
+-   **Anti-Pattern:** Creating or preserving separate `Queueable` Apex classes that are only called from a Domain Process Action.
+    -   **Correction:** The `DomainProcessAbstractAction` class has native, built-in support for asynchronous execution. When you encounter logic that requires asynchronous processing (e.g., to prevent `MIXED_DML` errors), you **MUST** place that logic directly inside the `runInProcess()` method of the `Action` class. You will then set the `<ExecuteAsynchronous__c>true</ExecuteAsynchronous__c>` field in the corresponding `DomainProcessBinding__mdt` record. This eliminates the redundant wrapper class and leverages the framework's built-in capabilities. **Do not create a new `Queueable` class to be called by an `Action`.**
 
 ### Dependency Resolution and Mocking
 

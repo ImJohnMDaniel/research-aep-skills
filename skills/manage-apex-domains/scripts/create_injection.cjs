@@ -257,6 +257,14 @@ async function run() {
                 // Dynamic Context Replacement
                 bindingContent = bindingContent.replace(/<field>ProcessContext__c<\/field>\s*<value.*>TriggerExecution<\/value>/, `<field>ProcessContext__c</field>\n        <value xsi:type="xsd:string">${contextValue}</value>`);
 
+                const isAsync = !!flags.async;
+                if (isAsync) {
+                    bindingContent = bindingContent.replace(
+                        /<field>ExecuteAsynchronous__c<\/field>\s*<value.*>false<\/value>/, 
+                        `<field>ExecuteAsynchronous__c</field>\n        <value xsi:type="xsd:boolean">true</value>`
+                    );
+                }
+
                 fs.writeFileSync(bindingPath, bindingContent);
                 console.log(`✔ Created Binding: ${bindingPath}`);
             }

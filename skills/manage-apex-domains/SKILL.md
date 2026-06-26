@@ -154,7 +154,7 @@ Your workflow is as follows:
 
     **Full Command Template:**
     ```bash
-    node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> --group <ProcessGroup> --ops "<TriggerOps>" --order <Order>
+    node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> --group <ProcessGroup> --ops "<TriggerOps>" --order <Order> [--async]
     ```
 
     **Example:**
@@ -282,6 +282,17 @@ When creating a `DomainProcessBinding__mdt` record for one of these SObjects, yo
 
 ### assets/
 - `DomainTemplate.cls`, `InterfaceTemplate.cls`, `TriggerTemplate.trigger`, `TestTemplate.cls`
+- `CriteriaTemplate.cls`, `CriteriaWithExistingRecsTemplate.cls`
+- `ActionTemplate.cls`, `ActionWithExistingRecsTemplate.cls`
+- `QueueableAction.cls`
+- `BindingTemplate.xml`: Universal template for both Domain and Process bindings.
+
+### references/examples/
+- `ExampleAction.cls`: A reference implementation of a Domain Process Action.
+- `ExampleCriteria.cls`: A reference implementation of a Domain Process Criteria.
+- `ExampleCriteriaWithExistingRecs.cls`: A reference implementation for update/delete criteria.
+- `ExampleActionWithExistingRecs.cls`: A reference implementation for update/delete actions.
+e.cls`, `TriggerTemplate.trigger`, `TestTemplate.cls`
 - `CriteriaTemplate.cls`, `CriteriaWithExistingRecsTemplate.cls`
 - `ActionTemplate.cls`, `ActionWithExistingRecsTemplate.cls`
 - `QueueableAction.cls`
