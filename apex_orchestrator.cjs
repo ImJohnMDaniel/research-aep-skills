@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * apex_orchestrator.cjs
  * 

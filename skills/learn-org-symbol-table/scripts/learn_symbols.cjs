@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
@@ -54,14 +55,14 @@ async function run() {
         // 3. Construct Query
         let whereClause = `Name NOT IN (${Array.from(localClassNames).map(n => `'${n}'`).join(',')})`;
         
-        if (!fetchAll) {
-            if (globPattern) {
-                // Tooling API supports LIKE but not full regex in WHERE usually, 
-                // but we can query then filter in JS for complex patterns.
-                // For simplicity, let's just query everything NOT local and filter in JS.
-            } else if (patterns.length > 0) {
-                whereClause += ` AND Name IN (${patterns.map(p => `'${p}'`).join(',')})`;
-            }
+        if (globPattern) {
+            // Convert glob-style wildcard '*' to SOQL LIKE wildcard '%'
+            const likePattern = globPattern.replace(/\*/g, '%');
+            whereClause += ` AND Name LIKE '${likePattern}'`;
+        } else if (patterns.length > 0) {
+            whereClause += ` AND Name IN (${patterns.map(p => `'${p}'`).join(',')})`;
+        } else if (fetchAll) {
+            console.log('Warning: The --all flag can be slow or fail on orgs with many classes. Consider using the --pattern flag for better performance.');
         }
 
         console.log('Fetching ApexClass metadata from org...');
@@ -69,10 +70,8 @@ async function run() {
         
         let classesToQuery = queryResult.result.records;
 
-        if (globPattern) {
-            const regex = new RegExp('^' + globPattern.replace(/\*/g, '.*') + '$', 'i');
-            classesToQuery = classesToQuery.filter(c => regex.test(c.Name));
-        }
+        // The globPattern is now handled by the more efficient SOQL query, 
+        // so the secondary JavaScript filter is no longer needed.
 
         console.log(`Found ${classesToQuery.length} matching classes in org that are NOT in the local project.`);
 
