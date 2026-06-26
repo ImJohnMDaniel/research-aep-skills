@@ -33,6 +33,7 @@ This skill manages the "Selector" layer for an SObject, following the AT4DX arch
 - **Naming Conventions**:
   - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
   - **Interface**: `{Prefix}_I{PluralSObjectName}Selector` (e.g., `EEORA_IAccommRequestsSelector`)
+  - **Selector Test Class**: `{Prefix}_{PluralSObjectName}SelectorTest` (e.g., `EEORA_AccommRequestsSelectorTest`)
 
 # Mandatory Development Workflow
 

@@ -271,6 +271,7 @@ When creating a `DomainProcessBinding__mdt` record for one of these SObjects, yo
 - **Naming Conventions**:
   - **Domain Class**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
   - **Interface**: `{Prefix}_I{PluralSObjectName}` (e.g., `EEORA_IAccommRequests`)
+  - **Domain Test Class**: `{Prefix}_{PluralSObjectName}Test` (e.g., `EEORA_AccommRequestsTest`)
   - **Trigger**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
 
 ## Resources
