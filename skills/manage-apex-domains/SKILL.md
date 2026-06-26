@@ -68,7 +68,7 @@ If you have not done so previously, use the `learn-org-symbol-table` skill and f
     * Specifically the inner class Application.Domain
 
 #### Custom Metadata Types
-If you have not done so previously, use the `learn-org-metadat` skill and understand the complete schema for the following Custom Metadata Types and review them thoroughly.  These custom metadata types are specifically related to AT4DX framework's management of Domain classes:
+If you have not done so previously, use the `learn-org-metadata` skill and understand the complete schema for the following Custom Metadata Types and review them thoroughly.  These custom metadata types are specifically related to AT4DX framework's management of Domain classes:
 
 ##### ApplicationFactory_DomainBinding__mdt
 This custom metadata type is used via the Force-DI dependency injection framework to map domain classes to their respective SObject and configure how the Application.Domain factory class will manage the domain implementations.
