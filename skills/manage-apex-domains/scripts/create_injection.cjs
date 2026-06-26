@@ -207,8 +207,42 @@ async function run() {
             const descriptionValue = flags.description || `Domain Process for ${sObjectName}`;
 
             for (const operation of triggerOperations) {
-                // Generate a safer, shorter name to avoid 40-char limit
-                const bindingName = `${sObjectName}_${componentName}_${operation}`.substring(0, 40);
+                // --- START: Custom Naming Convention Logic ---
+
+                // 1. Define the mapping for trigger operation abbreviations.
+                const opAbbreviations = {
+                    'After_Insert': 'AftIns',
+                    'After_Update': 'AftUpt',
+                    'After_Delete': 'AftDel',
+                    'After_Undelete': 'AftUnd',
+                    'Before_Insert': 'BefIns',
+                    'Before_Update': 'BefUpt',
+                    'Before_Delete': 'BefDel'
+                };
+
+                // Get the abbreviation for the current operation, or use the full name as a fallback.
+                const abbreviatedOp = opAbbreviations[operation] || operation;
+
+                // 2. Extract the prefix (e.g., "EEORA") from the full component name.
+                const prefix = componentName.split('_')[0];
+
+                // 3. Get the core part of the class name that needs to be abbreviated.
+                const classNameToAbbreviate = componentName.substring(prefix.length + 1);
+
+                // 4. Calculate the maximum length available for the class name part.
+                // Formula: 40 - (prefix + underscore + abbreviation + underscore)
+                const maxClassNameLength = 40 - prefix.length - 1 - abbreviatedOp.length - 1;
+
+                // Abbreviate the class name part by truncating it if it's too long.
+                const abbreviatedClassName = classNameToAbbreviate.length > maxClassNameLength
+                    ? classNameToAbbreviate.substring(0, maxClassNameLength)
+                    : classNameToAbbreviate;
+
+                // 5. Construct the final binding name using your specified convention.
+                const bindingName = `${prefix}_${abbreviatedClassName}_${abbreviatedOp}`;
+
+                // --- END: Custom Naming Convention Logic ---
+
                 const bindingPath = path.join(bindingDir, `DomainProcessBinding.${bindingName}.md-meta.xml`);
                 
                 let bindingContent = bindingTemplate
