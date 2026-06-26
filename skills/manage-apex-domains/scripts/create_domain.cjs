@@ -141,7 +141,13 @@ async function run() {
         const interfaceName = enforceLimit(`${appPrefix}_I${pluralSanitized}`);
         const testClassName = enforceLimit(`${appPrefix}_${pluralSanitized}`, "Test");
         const triggerName = enforceLimit(`${appPrefix}_${pluralSanitized}`);
-        const bindingFileName = `ApplicationFactory_DomainBinding.${appPrefix}_${baseSanitized}.md-meta.xml`;
+
+        let bindingName = `${appPrefix}_${baseSanitized}`;
+        if (baseSanitized.startsWith(appPrefix + '_')) {
+            bindingName = baseSanitized;
+        }
+        bindingName = bindingName.replace(/__/g, '_');
+        const bindingFileName = `ApplicationFactory_DomainBinding.${bindingName}.md-meta.xml`;
 
         // Validate all generated names before proceeding
         validateIdentifier(className);

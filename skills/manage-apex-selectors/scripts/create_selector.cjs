@@ -133,7 +133,13 @@ async function run() {
         const className = enforceLimit(`${appPrefix}_${pluralSanitized}Selector`);
         const interfaceName = enforceLimit(`${appPrefix}_I${pluralSanitized}Selector`);
         const testClassName = enforceLimit(`${appPrefix}_${pluralSanitized}Selector`, "Test");
-        const bindingFileName = `ApplicationFactory_SelectorBinding.${appPrefix}_${baseSanitized}.md-meta.xml`;
+
+        let bindingName = `${appPrefix}_${baseSanitized}`;
+        if (baseSanitized.startsWith(appPrefix + '_')) {
+            bindingName = baseSanitized;
+        }
+        bindingName = bindingName.replace(/__/g, '_');
+        const bindingFileName = `ApplicationFactory_SelectorBinding.${bindingName}.md-meta.xml`;
 
         // Validate all generated names before proceeding
         validateIdentifier(className);
