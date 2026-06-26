@@ -272,7 +272,7 @@ async function run() {
 
         if (!flags['no-deploy']) {
             console.log("\nDeploying all new components...");
-            execSync("sf project deploy start", { stdio: "inherit" });
+            execSync("sf project deploy start --ignore-conflicts", { stdio: "inherit" });
         } else {
             console.log("\nSkipping deployment as requested by --no-deploy flag.");
         }

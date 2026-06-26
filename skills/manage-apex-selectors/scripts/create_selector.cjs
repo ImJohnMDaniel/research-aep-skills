@@ -194,7 +194,7 @@ async function run() {
 
         if (changed) {
             console.log("\nDeploying changes...");
-            execSync("sf project deploy start", { stdio: "inherit" });
+            execSync("sf project deploy start --ignore-conflicts", { stdio: "inherit" });
         }
     } catch (error) {
         console.error("Error:", error.message);

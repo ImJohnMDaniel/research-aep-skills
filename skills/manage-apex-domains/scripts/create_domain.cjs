@@ -277,7 +277,7 @@ ${triggerHandlerBlock}
         if (changed && !flags['no-deploy']) {
             console.log("
 Deploying changes...");
-            execSync("sf project deploy start", { stdio: "inherit" });
+            execSync("sf project deploy start --ignore-conflicts", { stdio: "inherit" });
         } else if (changed) {
             console.log("
 Skipping deployment due to --no-deploy flag.");
