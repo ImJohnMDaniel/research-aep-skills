@@ -2,12 +2,12 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const os = require("os");
 
 const sObjectName = process.argv[2];
-const appPrefix = process.argv[3] || "EEORA";
 
 // Parse custom flags
-const args = process.argv.slice(4);
+const args = process.argv.slice(3);
 const flags = {};
 for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -36,7 +36,9 @@ for (let i = 0; i < args.length; i++) {
         flags[key] = value;
     }
 }
-const explicitFields = flags.fields ? flags.fields.split(",") : null;
+
+let explicitFields = flags.fields ? flags.fields.split(",") : null;
+const appPrefix = flags.prefix || "";
 
 if (!sObjectName) {
     console.error("Error: SObject name is required.");
@@ -194,10 +196,45 @@ async function run() {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         });
 
+        // --- Field Generation ---
+        if (!explicitFields) {
+            console.log(`No --fields flag found. Querying org for field list for ${sObjectName}...`);
+            const orgInfo = JSON.parse(execSync(`sf org display --json`, { encoding: 'utf8' }).toString()).result;
+            const learnScriptPath = path.join(__dirname, '../../learn-org-metadata/scripts/learn_metadata.cjs');
+            execSync(`node ${learnScriptPath} ${sObjectName}`);
+            
+            const projectPath = process.cwd();
+            const projectName = path.basename(projectPath);
+            const geminiTmpDir = path.join(os.homedir(), '.gemini', 'tmp', projectName);
+            const orgMetadataPath = path.join(geminiTmpDir, 'org-metadata', orgInfo.id, 'sobjects', `${sObjectName}.json`);
+            
+            const orgMetadata = JSON.parse(fs.readFileSync(orgMetadataPath, 'utf8'));
+
+            const orgFieldNames = orgMetadata.fields.map(f => f.name);
+            console.log('The path variable at REF-E is currently :: ', path);
+            console.log('The orgMetadata variable at REF-E is currently :: ', orgMetadata);
+            
+            const localFieldsPath = path.join(defaultDir, 'main', 'schema', 'objects', sObjectName, 'fields');
+            console.log('The path variable at REF-F is currently :: ', path);
+            console.log('The localFieldsPath variable at REF-F is currently :: ', localFieldsPath);
+
+            let localFieldNames = [];
+            if (fs.existsSync(localFieldsPath)) {
+                const localFieldFiles = fs.readdirSync(localFieldsPath).filter(f => f.endsWith('.field-meta.xml'));
+                for (const file of localFieldFiles) {
+                    const fileContent = fs.readFileSync(path.join(localFieldsPath, file), 'utf8');
+                    const match = fileContent.match(/<fullName>([\s\S]*?)<\/fullName>/);
+                    if (match && match[1]) {
+                        localFieldNames.push(match[1].trim());
+                    }
+                }
+            }
+            explicitFields = [...new Set([...orgFieldNames, ...localFieldNames])];
+            console.log(`Found ${explicitFields.length} total fields.`);
+        }
+
         const fieldList = explicitFields ? explicitFields.map(f => `            ${sObjectName}.${f}`).join(",\n") : `            ${sObjectName}.Id,\n            ${sObjectName}.Name`;
         
-        // const fieldListBlock = `    public List<Schema.SObjectField> getSObjectFieldList()\n    {\n        return new List<Schema.SObjectField> {\n${fieldList}\n        };\n    }`;
-
         const supportsMR = isSupportedByMetadataRelationship(sObjectName);
         const bindingSObjectValue = supportsMR ? `<value xsi:type="xsd:string">${sObjectName}</value>` : `<value xsi:nil="true"/>`;
         const bindingSObjectAlternateValue = supportsMR ? `<value xsi:nil="true"/>` : `<value xsi:type="xsd:string">${sObjectName}</value>`;

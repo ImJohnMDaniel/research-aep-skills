@@ -81,12 +81,12 @@ Generates or surgically updates the Selector class, Interface, and Unit Test.
 To generate or update a selector, run the bundled script:
 
   ```bash
-  node ./scripts/create_selector.cjs <SObjectName> [AppPrefix] --fields=Id,Name,CustomField__c
+  node ./scripts/create_selector.cjs <SObjectName> [--prefix=MyPrefix] [--fields=Id,Name,CustomField__c]
   ```
 
   Example:
   ```bash
-  node ./scripts/create_selector.cjs MyObject__c EEORA --fields=Id,Name,AccountNumber,Type
+  node ./scripts/create_selector.cjs MyObject__c --prefix=EEORA --fields=Id,Name,AccountNumber,Type
   ```
 
 ## Selector Method Injection (Modular Extension)
