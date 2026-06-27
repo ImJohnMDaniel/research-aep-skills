@@ -120,6 +120,13 @@ function updateFile(filePath, content, templateIfMissing) {
 
 async function run() {
     try {
+        const assetsDir = path.join(__dirname, '..', 'assets');
+        const domainTemplateContent = fs.readFileSync(path.join(assetsDir, 'DomainTemplate.cls'), 'utf8');
+        const interfaceTemplateContent = fs.readFileSync(path.join(assetsDir, 'InterfaceTemplate.cls'), 'utf8');
+        const testTemplateContent = fs.readFileSync(path.join(assetsDir, 'TestTemplate.cls'), 'utf8');
+        const triggerTemplateContent = fs.readFileSync(path.join(assetsDir, 'TriggerTemplate.trigger'), 'utf8');
+        const bindingTemplateContent = fs.readFileSync(path.join(assetsDir, 'BindingTemplate.xml'), 'utf8');
+
         console.log("--- Step 1: Live Verification of Base Dependencies ---");
         const learnScriptPath = path.join(__dirname, '../../learn-org-symbol-table/scripts/learn_symbols.cjs');
 
@@ -242,23 +249,11 @@ private class ${testClassName}
 {
 ${triggerHandlerBlock}
 }`;
-        const bindingTemplate = `<?xml version="1.0" encoding="UTF-8"?>
-<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-    <label>${className}</label>
-    <protected>false</protected>
-    <values>
-        <field>BindingSObject__c</field>
-        ${bindingSObjectValue}
-    </values>
-    <values>
-        <field>BindingSObjectAlternate__c</field>
-        ${bindingSObjectAlternateValue}
-    </values>
-    <values>
-        <field>To__c</field>
-        <value xsi:type="xsd:string">${className}.Constructor</value>
-    </values>
-</CustomMetadata>`;
+        const bindingTemplate = bindingTemplateContent
+            .replace(/{{ClassName}}/g, className)
+            .replace(/{{BindingSObjectValue}}/g, bindingSObjectValue)
+            .replace(/{{BindingSObjectAlternateValue}}/g, bindingSObjectAlternateValue)
+            .replace(/<field>To__c<\/field>\s*<value.*>{{ClassName}}<\/value>/, `<field>To__c</field>\n        <value xsi:type="xsd:string">${className}.Constructor</value>`);
 
         console.log(`
 --- Step 2: Creating/Updating Domain Artifacts for ${sObjectName} ---`);
@@ -303,6 +298,23 @@ No changes detected. Skipping deployment.");
     } catch (error) {
         console.error("Error:", error.message);
         process.exit(1);
+    }
+}
+
+run();
+oy flag.");
+        } else {
+            console.log("
+No changes detected. Skipping deployment.");
+        }
+    } catch (error) {
+        console.error("Error:", error.message);
+        process.exit(1);
+    }
+}
+
+run();
+;
     }
 }
 
