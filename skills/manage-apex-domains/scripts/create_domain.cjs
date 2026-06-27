@@ -205,30 +205,6 @@ async function run() {
         const bindingSObjectValue = supportsMR ? `<value xsi:type="xsd:string">${sObjectName}</value>` : `<value xsi:nil="true"/>`;
         const bindingSObjectAlternateValue = supportsMR ? `<value xsi:nil="true"/>` : `<value xsi:type="xsd:string">${sObjectName}</value>`;
 
-//         const domainTemplate = `public inherited sharing class ${className}
-//     extends ApplicationSObjectDomain
-//     implements ${interfaceName}
-// {
-// ${newInstanceBlock}
-
-//     public ${className}()
-//     {
-//         super( new List<${sObjectName}>() );
-//     }
-
-//     public ${className}(List<${sObjectName}> records)
-//     {
-//         super(records);
-//     }
-
-// ${constructorClassBlock}
-// }`;
-//         const interfaceTemplate = `public interface ${interfaceName}
-//     extends IApplicationSObjectDomain
-// {
-    
-// }`;
-
         const domainTemplate = domainTemplateContent
             .replace(/{{ClassName}}/g, className)
             .replace(/{{InterfaceName}}/g, interfaceName)
@@ -246,8 +222,7 @@ async function run() {
         const bindingTemplate = bindingTemplateContent
             .replace(/{{ClassName}}/g, className)
             .replace(/{{BindingSObjectValue}}/g, bindingSObjectValue)
-            .replace(/{{BindingSObjectAlternateValue}}/g, bindingSObjectAlternateValue)
-            .replace(/<field>To__c<\/field>\s*<value.*>{{ClassName}}<\/value>/, `<field>To__c</field>\n        <value xsi:type="xsd:string">${className}.Constructor</value>`);
+            .replace(/{{BindingSObjectAlternateValue}}/g, bindingSObjectAlternateValue);
 
         console.log(`--- Step 2: Creating/Updating Domain Artifacts for ${sObjectName} ---`);
 
