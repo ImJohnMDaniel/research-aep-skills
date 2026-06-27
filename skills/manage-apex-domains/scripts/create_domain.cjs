@@ -107,9 +107,7 @@ function updateFile(filePath, content, templateIfMissing) {
     if (filePath.endsWith(".cls") || filePath.endsWith(".trigger")) {
         const lastBraceIndex = existingContent.lastIndexOf("}");
         if (lastBraceIndex !== -1) {
-            const updated = existingContent.substring(0, lastBraceIndex) + "
-" + content + "
-" + existingContent.substring(lastBraceIndex);
+            const updated = existingContent.substring(0, lastBraceIndex) + "\n" + content + "\n" + existingContent.substring(lastBraceIndex);
             fs.writeFileSync(filePath, updated);
             console.log(` - Updated: ${filePath}`);
             return true;
@@ -207,64 +205,60 @@ async function run() {
         const bindingSObjectValue = supportsMR ? `<value xsi:type="xsd:string">${sObjectName}</value>` : `<value xsi:nil="true"/>`;
         const bindingSObjectAlternateValue = supportsMR ? `<value xsi:nil="true"/>` : `<value xsi:type="xsd:string">${sObjectName}</value>`;
 
-        const domainTemplate = `public inherited sharing class ${className}
-    extends ApplicationSObjectDomain
-    implements ${interfaceName}
-{
-${newInstanceBlock}
+//         const domainTemplate = `public inherited sharing class ${className}
+//     extends ApplicationSObjectDomain
+//     implements ${interfaceName}
+// {
+// ${newInstanceBlock}
 
-    public ${className}()
-    {
-        super( new List<${sObjectName}>() );
-    }
+//     public ${className}()
+//     {
+//         super( new List<${sObjectName}>() );
+//     }
 
-    public ${className}(List<${sObjectName}> records)
-    {
-        super(records);
-    }
+//     public ${className}(List<${sObjectName}> records)
+//     {
+//         super(records);
+//     }
 
-${constructorClassBlock}
-}`;
-        const interfaceTemplate = `public interface ${interfaceName}
-    extends IApplicationSObjectDomain
-{
+// ${constructorClassBlock}
+// }`;
+//         const interfaceTemplate = `public interface ${interfaceName}
+//     extends IApplicationSObjectDomain
+// {
     
-}`;
-        const testTemplate = `@IsTest
-private class ${testClassName}
-{
-    @IsTest 
-    private static void testNewInstanceMethod()
-    {
-        Id recordId = fflib_IDGenerator.generate( ${sObjectName}.SObjectType );
-        ${sObjectName} record = new ${sObjectName}( Id = recordId );
-        Test.startTest();
-        ${className}.newInstance( new List<${sObjectName}>{ record } );
-        ${className}.newInstance( new Set<Id>{ recordId } );
-        Test.stopTest();
-    }
-}`;
-        const triggerTemplate = `trigger ${triggerName} on ${sObjectName} 
-    (after delete, after insert, after update, after undelete, before delete, before insert, before update) 
-{
-${triggerHandlerBlock}
-}`;
+// }`;
+
+        const domainTemplate = domainTemplateContent
+            .replace(/{{ClassName}}/g, className)
+            .replace(/{{InterfaceName}}/g, interfaceName)
+            .replace(/{{SObjectName}}/g, sObjectName);
+        const interfaceTemplate = interfaceTemplateContent
+            .replace(/{{InterfaceName}}/g, interfaceName);
+        const testTemplate = testTemplateContent
+            .replace(/{{TestClassName}}/g, testClassName)
+            .replace(/{{SObjectName}}/g, sObjectName)
+            .replace(/{{ClassName}}/g, className);
+        const triggerTemplate = triggerTemplateContent
+            .replace(/{{TriggerName}}/g, triggerName)
+            .replace(/{{SObjectName}}/g, sObjectName)
+            .replace(/{{ClassName}}/g, className);            
         const bindingTemplate = bindingTemplateContent
             .replace(/{{ClassName}}/g, className)
             .replace(/{{BindingSObjectValue}}/g, bindingSObjectValue)
             .replace(/{{BindingSObjectAlternateValue}}/g, bindingSObjectAlternateValue)
             .replace(/<field>To__c<\/field>\s*<value.*>{{ClassName}}<\/value>/, `<field>To__c</field>\n        <value xsi:type="xsd:string">${className}.Constructor</value>`);
 
-        console.log(`
---- Step 2: Creating/Updating Domain Artifacts for ${sObjectName} ---`);
+        console.log(`--- Step 2: Creating/Updating Domain Artifacts for ${sObjectName} ---`);
 
         let changed = false;
-        changed |= updateFile(paths.domain, newInstanceBlock, domainTemplate);
-        if (fs.existsSync(paths.domain)) updateFile(paths.domain, constructorClassBlock, domainTemplate);
+        changed |= updateFile(paths.domain, "", domainTemplate);
+        // if (fs.existsSync(paths.domain)) updateFile(paths.domain, constructorClassBlock, domainTemplate);
 
+// TODO: Review these and are they still needed
         changed |= updateFile(paths.interface, "", interfaceTemplate);
-        changed |= updateFile(paths.test, "testNewInstanceMethod", testTemplate);
-        changed |= updateFile(paths.trigger, triggerHandlerBlock, triggerTemplate);
+        changed |= updateFile(paths.test, "", testTemplate);
+        changed |= updateFile(paths.trigger, "", triggerTemplate);
 
         if (!fs.existsSync(paths.binding)) {
             fs.writeFileSync(paths.binding, bindingTemplate);
@@ -285,36 +279,35 @@ ${triggerHandlerBlock}
         });
 
         if (changed && !flags['no-deploy']) {
-            console.log("
-Deploying changes...");
-            execSync("sf project deploy start --ignore-conflicts", { stdio: "inherit" });
+            console.log("\nDeploying changes...");
+            try {
+                const deployOutput = execSync("sf project deploy start --ignore-conflicts --json", { encoding: 'utf8' });
+                const deployResult = JSON.parse(deployOutput);
+                if (deployResult.status === 0) {
+                    console.log("✔ Deployment Succeeded.");
+                } else {
+                    console.error("✖ Deployment Failed. Details:");
+                    console.error(JSON.stringify(deployResult.result, null, 2));
+                    process.exit(1);
+                }
+            } catch (error) {
+                console.error("✖ Deployment command failed to execute.");
+                try {
+                    const errorResult = JSON.parse(error.stdout);
+                    console.error(JSON.stringify(errorResult.result || errorResult, null, 2));
+                } catch (parseError) {
+                    console.error("Raw error output:", error.stdout || error.message);
+                }
+                process.exit(1);
+            }
         } else if (changed) {
-            console.log("
-Skipping deployment due to --no-deploy flag.");
+            console.log("\nSkipping deployment due to --no-deploy flag.");
         } else {
-            console.log("
-No changes detected. Skipping deployment.");
+            console.log("\nNo changes detected. Skipping deployment.");
         }
     } catch (error) {
         console.error("Error:", error.message);
         process.exit(1);
-    }
-}
-
-run();
-oy flag.");
-        } else {
-            console.log("
-No changes detected. Skipping deployment.");
-        }
-    } catch (error) {
-        console.error("Error:", error.message);
-        process.exit(1);
-    }
-}
-
-run();
-;
     }
 }
 
