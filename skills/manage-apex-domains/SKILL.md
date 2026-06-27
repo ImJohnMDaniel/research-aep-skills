@@ -65,7 +65,7 @@ If you have not done so previously, use the `learn-org-symbol-table` skill and f
 
 ##### Apex Classes Related to the AT4DX Application Domain Factory
 * `Application`
-    * Specifically the inner class Application.Domain
+    * Specifically the inner class `Application.Domain`
 
 #### Custom Metadata Types
 If you have not done so previously, use the `learn-org-metadata` skill and understand the complete schema for the following Custom Metadata Types and review them thoroughly.  These custom metadata types are specifically related to AT4DX framework's management of Domain classes:
@@ -96,7 +96,6 @@ Generates or surgically updates the Domain class, Interface, Trigger, and Unit T
 3.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}` convention (40-char limit), handling standard/custom objects appropriately.
 4.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
 
-
 - **Usage**:
 To generate or update a domain, run the bundled script:
 
@@ -104,10 +103,10 @@ To generate or update a domain, run the bundled script:
   node ./scripts/create_domain.cjs <SObjectName> [AppPrefix]
   ```
 
-Example:
-```bash
-node ./scripts/create_domain.cjs MyObject__c EEORA
-```
+  Example:
+  ```bash
+  node ./scripts/create_domain.cjs MyObject__c EEORA
+  ```
 
 ## Domain Process Injection (Modular Extension)
 *Use this path to add logic to an **existing** domain discovered in the Pre-flight Check.*
