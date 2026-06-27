@@ -11,7 +11,7 @@ private class %%METHOD_NAME%%SelectorMethod_UT {
 
         // 2. Prepare the parameters that will be passed to the method
         %%METHOD_NAME%%SelectorParams params = new %%METHOD_NAME%%SelectorParams();
-        // params.recordIds = new Set<Id>{ fflib_IDGenerator.generate(Account.SObjectType) };
+        %%TEST_PARAM_ASSIGNMENTS%%
 
         // 3. Instantiate the injectable method class
         %%METHOD_NAME%%SelectorMethod method = new %%METHOD_NAME%%SelectorMethod();

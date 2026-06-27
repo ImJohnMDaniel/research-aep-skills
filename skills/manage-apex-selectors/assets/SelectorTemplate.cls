@@ -7,11 +7,14 @@ public inherited sharing class {{ClassName}}
         return ({{InterfaceName}}) Application.Selector.newInstance({{SObjectType}}.SObjectType);
     }
 
-    public List<Schema.SObjectField> getSObjectFieldList()
+    public override List<Schema.SObjectField> getSObjectFieldList()
     {
         return new List<Schema.SObjectField> {
             {{SObjectType}}.Id,
             {{SObjectType}}.Name
+            /*
+            *   Add additional fields here
+            */
         };
     }
 

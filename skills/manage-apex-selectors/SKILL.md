@@ -16,185 +16,121 @@ There is no room for deviation. All analysis, code generation, and recommendatio
 
 # Manage Apex Selectors (AT4DX)
 
-This skill manages the "Selector" layer for an SObject, following the AT4DX architectural standard.
+This skill manages the "Selector" layer for an SObject, including both the core class structure and the **Selector Method Injection** pattern for modular extension, following the AT4DX architectural standard.
 
-## Architectural Mandates
+## Mandatory Selector Workflow
 
-- **Inheritance**: All Selector classes MUST inherit from `ApplicationSObjectSelector`.
-- **Interfaces**: All Selectors MUST implement a corresponding interface (e.g., `IAccountsSelector`) which extends `IApplicationSObjectSelector` when `at4dx` is present in the project's dependencies. If `at4dx` is not present, custom interfaces are optional but recommended.
-- **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
-- **Calling Selectors**: Always call the selector's static `newInstance()` method directly within your business logic. Do not store selectors as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
-- **Access**: Use the `newInstance()` static method to access selectors via the `Application.Selector` factory.
-- **Strict Return Types (No Transformations / Single Records)**: All custom query methods in a Selector class MUST only return either a `List<SObject>` or a `Database.QueryLocator`. They **MUST NOT**:
-  - Return a single `SObject` record (e.g., `User` instead of `List<User>`), as this violates the platform's **bulkification mandate** and is a critical anti-pattern.
-  - Return any non-SObject collection types or maps of primitives (e.g., `Set<String>`, `Map<String, Id>`), as **Selectors must never perform data transformations**; this logic belongs in the calling Service, Domain, or Action layer.
-- **One Selector, One SObject**: A Selector class is strictly responsible for querying a single SObject. It is a critical anti-pattern for a selector to query another SObject's data, even if it is a related child or parent. Instead, you must invoke the appropriate selector for that object. For example, `AccountSelector` must not query for `Contact` records; it must call `ContactsSelector.newInstance()`. This is enforced by ensuring any call to `newQueryFactory(SomeObject__c.SObjectType)` uses an SObject type that matches the selector's own `getSObjectType()`.
+**CRITICAL:** Before creating or extending any Selector layer, you MUST follow this workflow to determine if the Selector is managed locally or by a dependency. Failure to do so is a critical architectural violation.
 
-- **Naming Conventions**:
-  - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
-  - **Interface**: `{Prefix}_I{PluralSObjectName}Selector` (e.g., `EEORA_IAccommRequestsSelector`)
-  - **Selector Test Class**: `{Prefix}_{PluralSObjectName}SelectorTest` (e.g., `EEORA_AccommRequestsSelectorTest`)
+1.  **Analyze SObject Prefix:** Examine the API name of the SObject in question.
+    *   **If the prefix matches the project's prefix (e.g., `EEORA_`)**, the SObject is managed locally. Announce: "**[SObject API Name] is a local SObject. I will use `create_selector.cjs` to manage its selector layer.**" You may then proceed to the **Core Selector Management** section.
+    *   **If the prefix is different OR it is a standard SObject (e.g., `User`, `Account`)**, the SObject is managed by an external dependency. Proceed to the next step.
 
-# Mandatory Development Workflow
+2.  **Deduce and Verify External Selector:** For external SObjects, you must find the existing selectro, not create a new one.
+    *   **Deduce Name:** Hypothesize the selector's class name based on its prefix, plural name, and "Selector" (e.g., `UCMN_UsersSelector`, `OTHERPREFIX_MyObjectsSelector`).
+    *   **Verify with Skill:** Use the `learn-org-symbol-table` skill to search for the hypothesized class name.
+    *   **Announce Finding:**
+        *   If the class is found, announce: "**Verified that the external selector [Verified Class Name] exists. I will use the Selector Method Injection pattern to extend it.**" You may then proceed to the **Selector Method Injection** section.
+        *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local selector for an external SObject.
 
-**CRITICAL:** Before writing any code, you MUST follow this workflow. Failure to do so will result in compilation and deployment errors.
+### Ensure Exact Understanding Of Classes, Interfaces, and Custom Metadata Types From AT4DX Framework Related to Apex Selectors
 
-### Step 1: Deduce Selector Class Existence
+#### Apex Classes
+If you have not done so previously, use the `learn-org-symbol-table` skill and find the SymbolTables for the following Apex classes and review them thoroughly.  These classes are specifically related to AT4DX framework's management of Selector classes.  Note: The AT4DX Framework classes do not have a prefix.  Do not try to add on infer a prefix for these AT4DX classes mentioned here.
 
-Before creating a selector class, you MUST deduce whether the selector is managed locally by this project or by an external dependency package.
+##### Core Selector Classes from the FFLIB Apex Common Framework
+* `fflib_ISObjectSelector`
+* `fflib_SObjectSelector`
+* `fflib_QueryFactory`
 
-#### Scenario A: Standard SObjects (e.g., `User`, `Account`)
-1.  **Deduction:** Standard SObject selectors are assumed to be managed by the foundational dependency package (`universal-common`) and will be prefixed with `UCMN_` and suffixed with `Selector` (e.g., `UCMN_UsersSelector`, `UCMN_AccountsSelector`).
-2.  **Verification:** Use the `learn-org-symbol-table` skill to search for the expected class name:
-    ```bash
-    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_UsersSelector
-    ```
-3.  **Path:** If the script successfully retrieves the symbol table, the selector **exists in a dependency**. You **MUST NOT** create a new selector locally. Instead, use the **Extending Selectors via Injection** pattern to invoke your custom query.
+##### Core Selector Classes from the AT4DX Framework
+* `ApplicationSObjectSelector`
+* `IApplicationSObjectSelector`
 
-#### Scenario B: Custom SObjects (e.g., `Prefix_MyObject__c`)
-1.  **Deduction:** Analyze the prefix of the SObject API name.
-    *   If the prefix matches this project's prefix (`EEORA`), the SObject is managed by this project. You may proceed to **Core Selector Management** to create or update the selector locally.
-    *   If the prefix is **different** (e.g., `UCMN_`), the SObject is managed by a dependency package.
-2.  **Verification:** For external custom SObjects, deduce the expected selector name using that external prefix (e.g., `UCMN_MyObjectsSelector`) and verify its existence in the org using the `learn-org-symbol-table` skill:
-    ```bash
-    node skills/learn-org-symbol-table/scripts/learn_symbols.cjs UCMN_MyObjectsSelector
-    ```
-3.  **Path:** If the selector is external, you **MUST NOT** create it locally. Use the **Extending Selectors via Injection** pattern to invoke your custom query.
+##### Apex Classes Related to Selector Method Injection from the AT4DX Framework
+* `AbstractSelectorMethodInjectable`
+* `AbstractSelectorQueryLocatorInjectable`
+* `ISelectorMethodInjectable`
+* `ISelectorMethodParameterable`
+* `ISelectorMethodSetable`
+* `ISelectorQueryLocatorMethodInjectable`
+
+##### Apex Classes Related to the AT4DX Application Selector Factory
+* `Application`
+    * Specifically the inner class `Application.Selector`
+
+#### Custom Metadata Types
+If you have not done so previously, use the `learn-org-metadata` skill and understand the complete schema for the following Custom Metadata Types and review them thoroughly.  These custom metadata types are specifically related to AT4DX framework's management of Selector classes:
+
+##### ApplicationFactory_SelectorBinding__mdt
+This custom metadata type is used via the Force-DI dependency injection framework to map selector classes to their respective SObject and configure how the Application.Selector factory class will manage the selector implementations.
 
 ## Core Selector Management
 *Use this path ONLY if the deduction workflow in Step 1 determines the selector is managed locally by this project.*
 
-**0. Dependency Check (Pre-Check)**
+Generates or surgically updates the Selector class, Interface, and Unit Test.
 
-Before creating or refactoring a selector, the agent MUST inspect `sfdx-project.json` for project dependencies:
--   **If `at4dx` is a dependency:** You **MUST** generate both the concrete selector class and its corresponding interface (extending `IApplicationSObjectSelector`). Omitting the interface is a critical architectural violation under `AT4DX`.
--   **If `at4dx` is NOT a dependency:** The interface is optional (Class-Based approach is allowed to reduce boilerplate), though still recommended if dynamic binding is needed.
+1.  **Validation:** Checks if the SObject exists in the local project's metadata.
+2.  **Surgical Update / Creation:**
+    *   If files don't exist, they are created from templates in the `assets/` folder.
+    *   If files exist (Selector, Interface, Test), the skill surgically inserts required boilerplate (like `newInstance` methods) while **preserving all existing methods and custom logic**.
+3.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}Selector` convention (40-char limit), handling standard/custom objects appropriately.
+4.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
 
-**1. Field List Population**:
-- Before creating or updating a selector, the agent MUST use the `learn-org-metadata` skill to retrieve the SObject's field list.
-- **Filter**: Exclude all fields with `LongTextArea` or `RichTextArea` data types (`textarea` type with `htmlFormatted: true` or large length) to prevent heap size issues.
-- **Verification**: If the filtered list contains more than **50 fields** AND the selector class is part of the **current project**, the agent MUST verify with the user via `ask_user` if they wish to include all fields. If the selector is part of a **dependency project** (not in the local source), ignore the 50-field verification and include the fields as needed (or as directed).
-**2. Creation / Update**: Generates or surgically updates the Selector class, Interface, and Unit Test.
-**3. Binding**: Creates a custom metadata record in `selectorBindings`.
-**4. Deployment**: Automatically deploys the artifacts to the org.
+- **Usage**:
+To generate or update a selector, run the bundled script:
 
-## Workflow: Extending Selectors via Injection
+  ```bash
+  node ./scripts/create_selector.cjs <SObjectName> [AppPrefix] --fields=Id,Name,CustomField__c
+  ```
+
+  Example:
+  ```bash
+  node ./scripts/create_selector.cjs MyObject__c EEORA --fields=Id,Name,AccountNumber,Type
+  ```
+
+## Selector Method Injection (Modular Extension)
+*Use this path to add logic to an **existing** selector discovered in the Pre-flight Check.*
 
 This is the architecturally correct pattern for adding custom query logic to a Selector from a dependency package (e.g., adding a query to `UCMN_UsersSelector`).
 
-To implement, you will create three components in your local project: a **Parameter Class**, an **Injectable Method Class**, and a **Unit Test**.
 
-### 1. Create the Parameter Class
-This class bundles all arguments for your query into a single object.
+### Creating Injections with `create_selector_method_injection.cjs` (Agent Workflow)
 
--   **Action:** Create a new Apex class.
--   **Naming:** `{MethodName}SelectorParams`
--   **Implementation:** It MUST `implements ISelectorMethodParameterable`. It contains public member variables for each parameter.
+**CRITICAL:** You MUST execute this script non-interactively by providing all required information via command-line flags. Attempting to run the script without these flags will cause it to enter an interactive mode that you cannot complete.
 
-**Example (`EEORA_UsersByStateSelectorParams.cls`):**
-```apex
-public class EEORA_UsersByStateSelectorParams implements ISelectorMethodParameterable {
-    public Set<String> states;
-    public Integer resultLimit;
-}
-```
+Your workflow is as follows:
 
-### 2. Create the Injectable Method Class
-This class contains the actual query logic.
+1.  **Determine Parameters:** Before execution, you must determine the values for the following parameters:
+    *   `ComponentName`: The name for the new Apex class (e.g., `EEORA_MyNewSelectorMethod`).
+    *   `SObjectName`: The API name of the SObject being targeted (e.g., `User`, `Account`).
+    *   `SelectorName`: The name of the existing Apex selector class (e.g., `UCMN_UsersSelector`).
 
--   **Action:** Create a new Apex class.
--   **Naming:** `{MethodName}SelectorMethod`
--   **Implementation:** It MUST `extends AbstractSelectorMethodInjectable` and `implements ISelectorMethodInjectable`. It contains the `selectQuery()` method.
+2.  **Construct and Execute Command:** Assemble the final command using the non-interactive flags.
 
-**Example (`EEORA_UsersByStateSelectorMethod.cls`):**
-```apex
-public class EEORA_UsersByStateSelectorMethod
-    extends AbstractSelectorMethodInjectable
-    implements ISelectorMethodInjectable
-{
-    public List<SObject> selectQuery() {
-        // Cast the generic parameters object to your concrete class
-        EEORA_UsersByStateSelectorParams params = (EEORA_UsersByStateSelectorParams) getParams();
-        
-        // Use the query factory from the base class
-        return Database.query(
-            newQueryFactory()
-                .setCondition('State IN :params.states')
-                .setLimit(params.resultLimit)
-                .toSOQL()
-        );
-    }
-}
-```
-*(For queries returning a `Database.QueryLocator`, extend `AbstractSelectorQueryLocatorInjectable` instead.)*
+    **Full Command Template:**
+    ```bash
+    node ./scripts/create_selector_method_injection.cjs <ComponentName> <SObjectName> <SelectorName>
+    ```
+
+    **Example:**
+    ```bash
+    # This command creates a Selector Method class non-interactively.
+    node ./scripts/create_selector_method_injection.cjs EEORA_MyNewSelectorMethod User UCMN_UsersSelector
+    ```
+3.  **Verify:** After execution, verify that the new Apex class file has been created in the correct directories.
 
 
-### 3. Invoke the Injectable Method
-From your service or domain layer, invoke your new method through the base dependency selector.
 
-**Example (in a service method):**
-```apex
-// 1. Get the base selector from the dependency package
-IUsersSelector usersSelector = (IUsersSelector) Application.Selector.newInstance(User.SObjectType);
 
-// 2. Prepare the parameters
-EEORA_UsersByStateSelectorParams params = new EEORA_UsersByStateSelectorParams();
-params.states = new Set<String>{'CA', 'NY'};
-params.resultLimit = 100;
-
-// 3. Execute the injection
-List<User> users = (List<User>) usersSelector.selectInjection(
-    EEORA_UsersByStateSelectorMethod.class,
-    params
-);
-```
-
-### 4. Create the Unit Test
-Test the injectable method class in isolation.
-
-**Example (`EEORA_UsersByStateSelectorMethod_UT.cls`):**
-```apex
-@IsTest
-private class EEORA_UsersByStateSelectorMethod_UT {
-    @IsTest
-    private static void testQueryConstruction() {
-        // 1. Setup
-        fflib_ApexMocks mocks = new fflib_ApexMocks();
-        // Mock the query factory to intercept calls
-        fflib_QueryFactory mockQueryFactory = (fflib_QueryFactory) mocks.mock(fflib_QueryFactory.class);
-
-        // 2. Prepare parameters
-        EEORA_UsersByStateSelectorParams params = new EEORA_UsersByStateSelectorParams();
-        params.states = new Set<String>{'CA'};
-        params.resultLimit = 50;
-
-        // 3. Instantiate the injectable method
-        EEORA_UsersByStateSelectorMethod method = new EEORA_UsersByStateSelectorMethod();
-        method.setQueryFactory(mockQueryFactory);
-        method.setParameters(params);
-
-        // 4. Execute
-        method.selectQuery();
-
-        // 5. Verify
-        // Use the mock framework to verify that the query was constructed correctly
-        ((fflib_QueryFactory) mocks.verify(mockQueryFactory, 1))
-            .setCondition('State IN :params.states');
-        ((fflib_QueryFactory) mocks.verify(mockQueryFactory, 1))
-            .setLimit(params.resultLimit);
-    }
-}
-```
-***Note: New templates for these files will be available in the `assets` folder: `InjectableMethodTemplate.cls`, `InjectableMethodParamsTemplate.cls`, and `InjectableMethodTestTemplate.cls`.***
-
-### Adding Custom Query Methods
+## Adding Custom Query Methods
 
 When extending a generated selector with new query methods, you **MUST** use the `newQueryFactory()` method inherited from the base selector. This is critical for maintaining testability.
 
 -   For queries on the selector's primary SObject, call `newQueryFactory()` with no arguments.
 -   For queries on a different SObject (e.g., a related child object), pass the SObject Type to the method, like `newQueryFactory(OtherObject__c.SObjectType)`.
 
-#### Method Signature & Return Type Restrictions
+### Method Signature & Return Type Restrictions
 
 Every custom query method MUST adhere to strict return type guidelines:
 1. **Allowed Return Types**: Only `List<SObject>` (or specific lists like `List<MyObject__c>`) and `Database.QueryLocator` are permitted.
@@ -223,20 +159,28 @@ fflib_QueryFactory qf = new fflib_QueryFactory(this);
 fflib_QueryFactory qf = new fflib_QueryFactory(MyObject__c.SObjectType);
 ```
 
-## Usage
+## Architectural Mandates
 
-To generate or update a selector with a specific field list:
+- **Inheritance**: All Selector classes MUST inherit from `ApplicationSObjectSelector`.
+- **Interfaces**: All Selectors MUST implement a corresponding interface (e.g., `IAccountsSelector`) which extends `IApplicationSObjectSelector` when `at4dx` is present in the project's dependencies. If `at4dx` is not present, custom interfaces are optional but recommended.
+- **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
+- **Access**: Use the `newInstance()` static method to access selectors via the `Application.Selector` factory.
+- **Calling Selectors**: Always call the selector's static `newInstance()` method directly within your business logic. Do not store selectors as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
+- **Strict Return Types (No Transformations / Single Records)**: All custom query methods in a Selector class MUST only return either a `List<SObject>` or a `Database.QueryLocator`. They **MUST NOT**:
+  - Return a single `SObject` record (e.g., `User` instead of `List<User>`), as this violates the platform's **bulkification mandate** and is a critical anti-pattern.
+  - Return any non-SObject collection types or maps of primitives (e.g., `Set<String>`, `Map<String, Id>`), as **Selectors must never perform data transformations**; this logic belongs in the calling Service, Domain, or Action layer.
+- **One Selector, One SObject**: A Selector class is strictly responsible for querying a single SObject. It is a critical anti-pattern for a selector to query another SObject's data, even if it is a related child or parent. Instead, you must invoke the appropriate selector for that object. For example, `AccountSelector` must not query for `Contact` records; it must call `ContactsSelector.newInstance()`. This is enforced by ensuring any call to `newQueryFactory(SomeObject__c.SObjectType)` uses an SObject type that matches the selector's own `getSObjectType()`.
 
-```bash
-node .\skills\manage-apex-selectors\scripts\create_selector.cjs <SObjectName> [AppPrefix] --fields=Id,Name,CustomField__c
-```
-
-Example:
-```bash
-node .\skills\manage-apex-selectors\scripts\create_selector.cjs Account EEORA --fields=Id,Name,AccountNumber,Type
-```
+- **Naming Conventions**:
+  - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
+  - **Interface**: `{Prefix}_I{PluralSObjectName}Selector` (e.g., `EEORA_IAccommRequestsSelector`)
+  - **Selector Test Class**: `{Prefix}_{PluralSObjectName}SelectorTest` (e.g., `EEORA_AccommRequestsSelectorTest`)
 
 ## Resources
+
+### scripts/
+- `create_selector.cjs`: Manages standard Selector layers.
+- `create_selector_method_injection.cjs`: Manages injectable modular components.
 
 ### assets/
 - `SelectorTemplate.cls`: Boilerplate for the Selector class.
