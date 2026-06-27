@@ -139,6 +139,12 @@ function updateFile(filePath, content, templateIfMissing) {
 
 async function run() {
     try {
+        const assetsDir = path.join(__dirname, '..', 'assets');
+        const selectorTemplateContent = fs.readFileSync(path.join(assetsDir, 'SelectorTemplate.cls'), 'utf8');
+        const interfaceTemplateContent = fs.readFileSync(path.join(assetsDir, 'InterfaceTemplate.cls'), 'utf8');
+        const testTemplateContent = fs.readFileSync(path.join(assetsDir, 'TestTemplate.cls'), 'utf8');
+        const bindingTemplateContent = fs.readFileSync(path.join(assetsDir, 'BindingTemplate.xml'), 'utf8');
+
         const sfdxProject = JSON.parse(fs.readFileSync("sfdx-project.json", "utf8"));
         const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
         const apiVersion = sfdxProject.sourceApiVersion || '67.0'; // Default to a recent API version if not found
@@ -219,7 +225,7 @@ async function run() {
 
         if (changed) {
             console.log("\nDeploying changes...");
-            execSync("sf project deploy start --ignore-conflicts", { stdio: "inherit" });
+            execSync("sf project deploy start --ignore-conflicts --json", { stdio: "pipe" });
         }
     } catch (error) {
         console.error("Error:", error.message);

@@ -130,7 +130,7 @@ fs.writeFileSync(paths.params, paramsContent);
         // --- 5. Deploy ---
         if (!flags['no-deploy']) {
             console.log("\nDeploying all new components...");
-            execSync("sf project deploy start --ignore-conflicts", { stdio: "inherit" });
+            execSync("sf project deploy start --ignore-conflicts --json", { stdio: "pipe" });
         } else {
             console.log("\nSkipping deployment as requested by --no-deploy flag. Please complete the implementation and deploy manually.");
         }
