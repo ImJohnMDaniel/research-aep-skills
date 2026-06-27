@@ -77,6 +77,9 @@ Generates or surgically updates the Selector class, Interface, and Unit Test.
 3.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}Selector` convention (40-char limit), handling standard/custom objects appropriately.
 4.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
 
+- **CRITICAL: Prefix Flag Mandate**
+  If you are aware of the project's prefix (e.g., from `GEMINI.md`), you **MUST** provide it to the script via the `--prefix` flag. This is not optional. While the script can now infer the prefix in some cases, explicitly providing it ensures 100% correctness and adherence to project conventions.
+
 - **Usage**:
 To generate or update a selector, run the bundled script:
 
