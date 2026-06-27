@@ -29,13 +29,16 @@ const flags = {};
 for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg.startsWith('--')) {
-        const key = arg.slice(2);
-        const nextArg = args[i + 1];
-        if (nextArg && !nextArg.startsWith('--')) {
-            flags[key] = nextArg;
-            i++;
+        const cleanArg = arg.slice(2);
+        if (cleanArg.includes('=')) {
+            const eqIndex = cleanArg.indexOf('=');
+            const key = cleanArg.substring(0, eqIndex);
+            let value = cleanArg.substring(eqIndex + 1);
+            if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+            if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+            flags[key] = value;
         } else {
-            flags[key] = true;
+            flags[cleanArg] = true;
         }
     }
 }

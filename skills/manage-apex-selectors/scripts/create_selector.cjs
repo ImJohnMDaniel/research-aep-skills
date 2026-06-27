@@ -5,8 +5,27 @@ const { execSync } = require("child_process");
 
 const sObjectName = process.argv[2];
 const appPrefix = process.argv[3] || "EEORA";
-const fieldsArg = process.argv.find(arg => arg.startsWith("--fields="));
-const explicitFields = fieldsArg ? fieldsArg.split("=")[1].split(",") : null;
+
+// Parse custom flags
+const args = process.argv.slice(4);
+const flags = {};
+for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--')) {
+        const cleanArg = arg.slice(2);
+        if (cleanArg.includes('=')) {
+            const eqIndex = cleanArg.indexOf('=');
+            const key = cleanArg.substring(0, eqIndex);
+            let value = cleanArg.substring(eqIndex + 1);
+            if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
+            if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
+            flags[key] = value;
+        } else {
+            flags[cleanArg] = true;
+        }
+    }
+}
+const explicitFields = flags.fields ? flags.fields.split(",") : null;
 
 if (!sObjectName) {
     console.error("Error: SObject name is required.");
