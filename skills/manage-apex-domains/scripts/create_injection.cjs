@@ -28,18 +28,29 @@ const args = process.argv.slice(5);
 const flags = {};
 for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+
     if (arg.startsWith('--')) {
-        const cleanArg = arg.slice(2);
-        if (cleanArg.includes('=')) {
-            const eqIndex = cleanArg.indexOf('=');
-            const key = cleanArg.substring(0, eqIndex);
-            let value = cleanArg.substring(eqIndex + 1);
+        let key = arg.slice(2);
+        let value = true; // Default to boolean true
+
+        const nextArg = args[i + 1];
+
+        // Case 1: --key=value
+        if (key.includes('=')) {
+            const eqIndex = key.indexOf('=');
+            value = key.substring(eqIndex + 1);
+            key = key.substring(0, eqIndex);
+            
             if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
             if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
-            flags[key] = value;
-        } else {
-            flags[cleanArg] = true;
+
+        // Case 2: --key value
+        } else if (nextArg && !nextArg.startsWith('--')) {
+            value = nextArg;
+            i++; 
         }
+        
+        flags[key] = value;
     }
 }
 
@@ -260,8 +271,8 @@ async function run() {
                 // Dynamic Context Replacement
                 bindingContent = bindingContent.replace(/<field>ProcessContext__c<\/field>\s*<value.*>TriggerExecution<\/value>/, `<field>ProcessContext__c</field>\n        <value xsi:type="xsd:string">${contextValue}</value>`);
 
-                const isAsync = !!flags.async;
-                if (isAsync) {
+                const isAsyncAction = !!flags.async && isAction;
+                if (isAsyncAction) {
                     bindingContent = bindingContent.replace(
                         /<field>ExecuteAsynchronous__c<\/field>\s*<value.*>false<\/value>/, 
                         `<field>ExecuteAsynchronous__c</field>\n        <value xsi:type="xsd:boolean">true</value>`
