@@ -5,7 +5,7 @@ private class {{TestClassName}}
     private static void testSelectById()
     {
         // Given
-        Id recordId = fflib_IDGenerator.generate({{SObjectType}}.SObjectType);
+        Id recordId = fflib_IDGenerator.generate({{SObjectName}}.SObjectType);
 
         // When
         {{ClassName}}.newInstance().selectById(new Set<Id> { recordId });

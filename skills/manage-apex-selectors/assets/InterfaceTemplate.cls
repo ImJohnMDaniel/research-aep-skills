@@ -1,5 +1,5 @@
 public interface {{InterfaceName}} 
     extends IApplicationSObjectSelector 
 {
-    List<{{SObjectType}}> selectById(Set<Id> idSet);
+    List<{{SObjectName}}> selectById(Set<Id> idSet);
 }

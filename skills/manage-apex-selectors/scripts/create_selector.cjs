@@ -183,32 +183,42 @@ async function run() {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         });
 
-        const newInstanceBlock = `    public static ${interfaceName} newInstance()\n    {\n        return (${interfaceName}) Application.Selector.newInstance(${sObjectName}.SObjectType);\n    }`;
-
         const fieldList = explicitFields ? explicitFields.map(f => `            ${sObjectName}.${f}`).join(",\n") : `            ${sObjectName}.Id,\n            ${sObjectName}.Name`;
         
-        const fieldListBlock = `    public List<Schema.SObjectField> getSObjectFieldList()\n    {\n        return new List<Schema.SObjectField> {\n${fieldList}\n        };\n    }`;
+        // const fieldListBlock = `    public List<Schema.SObjectField> getSObjectFieldList()\n    {\n        return new List<Schema.SObjectField> {\n${fieldList}\n        };\n    }`;
 
         const supportsMR = isSupportedByMetadataRelationship(sObjectName);
         const bindingSObjectValue = supportsMR ? `<value xsi:type="xsd:string">${sObjectName}</value>` : `<value xsi:nil="true"/>`;
         const bindingSObjectAlternateValue = supportsMR ? `<value xsi:nil="true"/>` : `<value xsi:type="xsd:string">${sObjectName}</value>`;
 
-        const selectorTemplate = `public inherited sharing class ${className} \n    extends ApplicationSObjectSelector \n    implements ${interfaceName} \n{\n${newInstanceBlock}\n\n${fieldListBlock}\n\n    public Schema.SObjectType getSObjectType()\n    {\n        return ${sObjectName}.SObjectType;\n    }\n\n    public List<${sObjectName}> selectById(Set<Id> idSet)\n    {\n        return (List<${sObjectName}>) selectSObjectsById(idSet);\n    }\n}`;
-        const interfaceTemplate = `public interface ${interfaceName} \n    extends IApplicationSObjectSelector \n{\n    List<${sObjectName}> selectById(Set<Id> idSet);\n}`;
-        const testTemplate = `@IsTest\nprivate class ${testClassName} \n{\n    @IsTest\n    private static void testSelectById()\n    {\n        Id recordId = fflib_IDGenerator.generate(${sObjectName}.SObjectType);\n        ${className}.newInstance().selectById(new Set<Id> { recordId });\n    }\n}`;
-        const bindingTemplate = `<?xml version="1.0" encoding="UTF-8"?>\n<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">\n    <label>${className}</label>\n    <protected>false</protected>\n    <values>\n        <field>BindingSObject__c</field>\n        ${bindingSObjectValue}\n    </values>\n    <values>\n        <field>BindingSObjectAlternate__c</field>\n        ${bindingSObjectAlternateValue}\n    </values>\n    <values>\n        <field>Priority__c</field>\n        <value xsi:nil="true"/>\n    </values>\n    <values>\n        <field>To__c</field>\n        <value xsi:type="xsd:string">${className}</value>\n    </values>\n</CustomMetadata>`;
+        const selectorTemplate = selectorTemplateContent
+            .replace(/{{ClassName}}/g, className)
+            .replace(/{{InterfaceName}}/g, interfaceName)
+            .replace(/{{SObjectName}}/g, sObjectName)
+            .replace(/{{SObjectFieldList}}/g, fieldList);
+        const interfaceTemplate = interfaceTemplateContent
+            .replace(/{{InterfaceName}}/g, interfaceName)
+            .replace(/{{SObjectName}}/g, sObjectName);
+        const testTemplate = testTemplateContent
+            .replace(/{{ClassName}}/g, className)
+            .replace(/{{TestClassName}}/g, testClassName)
+            .replace(/{{SObjectName}}/g, sObjectName);
+        const bindingTemplate = bindingTemplateContent
+            .replace(/{{ClassName}}/g, className)
+            .replace(/{{BindingSObjectValue}}/g, bindingSObjectValue)
+            .replace(/{{BindingSObjectAlternateValue}}/g, bindingSObjectAlternateValue);
 
         console.log(`Processing selector artifacts for ${sObjectName}:`);
 
         let changed = false;
-        changed |= updateFile(paths.selector, newInstanceBlock, selectorTemplate);
+        changed |= updateFile(paths.selector, "", selectorTemplate);
         // Ensure field list is updated even if file exists
         if (fs.existsSync(paths.selector)) {
-            changed |= updateFile(paths.selector, fieldListBlock, selectorTemplate);
+            changed |= updateFile(paths.selector, "", selectorTemplate);
         }
 
         changed |= updateFile(paths.interface, "", interfaceTemplate);
-        changed |= updateFile(paths.test, "testSelectById", testTemplate);
+        changed |= updateFile(paths.test, "", testTemplate);
 
         if (!fs.existsSync(paths.binding)) {
             fs.writeFileSync(paths.binding, bindingTemplate);
