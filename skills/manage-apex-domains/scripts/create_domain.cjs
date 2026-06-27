@@ -36,11 +36,22 @@ for (let i = 0; i < args.length; i++) {
     }
 }
 
-const appPrefix = flags.prefix || "";
+let appPrefix = flags.prefix;
 
 if (!sObjectName) {
     console.error("Error: SObject name is required.");
     process.exit(1);
+}
+
+// If --prefix is not provided, try to infer it from the SObject name.
+if (!appPrefix) {
+    if (sObjectName.includes('_') && (sObjectName.endsWith('__c') || sObjectName.endsWith('__mdt') || sObjectName.endsWith('__e'))) {
+        appPrefix = sObjectName.split('_')[0];
+        console.log(`--prefix flag not provided. Inferred prefix "${appPrefix}" from SObject name.`);
+    } else {
+        // For standard objects or objects without a clear prefix, default to empty.
+        appPrefix = ""; 
+    }
 }
 
 function getPlural(name) {
@@ -156,19 +167,25 @@ async function run() {
         const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
         const apiVersion = sfdxProject.sourceApiVersion;
 
-        const baseSanitized = sanitizeName(sObjectName, appPrefix);
+        const baseSanitized = sanitizeName(sObjectName);
         let pluralSanitized = getPlural(baseSanitized);
 
-        if (pluralSanitized.startsWith(appPrefix + '_')) {
+        // If a prefix is used, ensure it's not duplicated in the pluralized name.
+        if (appPrefix && pluralSanitized.startsWith(appPrefix + '_')) {
             pluralSanitized = pluralSanitized.substring(appPrefix.length + 1);
         }
-        const className = enforceLimit(`${appPrefix}_${pluralSanitized}`);
-        const interfaceName = enforceLimit(`${appPrefix}_I${pluralSanitized}`);
-        const testClassName = enforceLimit(`${appPrefix}_${pluralSanitized}`, "Test");
-        const triggerName = enforceLimit(`${appPrefix}_${pluralSanitized}`);
 
-        let bindingName = `${appPrefix}_${baseSanitized}`;
-        if (baseSanitized.startsWith(appPrefix + '_')) {
+        // Conditionally add prefix to avoid leading underscore
+        const domainNameBase = appPrefix ? `${appPrefix}_${pluralSanitized}` : pluralSanitized;
+        const interfaceNameBase = appPrefix ? `${appPrefix}_I${pluralSanitized}` : `I${pluralSanitized}`;
+
+        const className = enforceLimit(domainNameBase);
+        const interfaceName = enforceLimit(interfaceNameBase);
+        const testClassName = enforceLimit(domainNameBase, "Test");
+        const triggerName = enforceLimit(domainNameBase);
+
+        let bindingName = appPrefix ? `${appPrefix}_${baseSanitized}` : baseSanitized;
+        if (appPrefix && baseSanitized.startsWith(appPrefix + '_')) {
             bindingName = baseSanitized;
         }
         bindingName = bindingName.replace(/__/g, '_');
