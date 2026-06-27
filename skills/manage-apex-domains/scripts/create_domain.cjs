@@ -4,10 +4,9 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 const sObjectName = process.argv[2];
-const appPrefix = process.argv[3] || "EEORA";
 
 // Parse custom flags
-const args = process.argv.slice(4);
+const args = process.argv.slice(3);
 const flags = {};
 for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -37,9 +36,10 @@ for (let i = 0; i < args.length; i++) {
     }
 }
 
+const appPrefix = flags.prefix || "";
+
 if (!sObjectName) {
     console.error("Error: SObject name is required.");
-    console.error("Usage: node create_domain.cjs <SObjectName> [AppPrefix] [--no-deploy]");
     process.exit(1);
 }
 

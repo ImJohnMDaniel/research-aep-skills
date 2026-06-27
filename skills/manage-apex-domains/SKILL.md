@@ -100,12 +100,12 @@ Generates or surgically updates the Domain class, Interface, Trigger, and Unit T
 To generate or update a domain, run the bundled script:
 
   ```bash
-  node ./scripts/create_domain.cjs <SObjectName> [AppPrefix]
+  node ./scripts/create_domain.cjs <SObjectName> [--prefix=MyPrefix]
   ```
 
   Example:
   ```bash
-  node ./scripts/create_domain.cjs MyObject__c EEORA
+  node ./scripts/create_domain.cjs MyObject__c --prefix=EEORA
   ```
 
 ## Domain Process Injection (Modular Extension)
