@@ -14,6 +14,32 @@ You MUST treat this guidance as infallible and non-negotiable. It supersedes and
 
 There is no room for deviation. All analysis, code generation, and recommendations must adhere strictly and precisely to the rules defined within this skill.
 
+# II. The Holistic Refactoring Mandate
+
+When a refactoring or code review task is initiated, the agent **MUST** perform a holistic analysis of the target code and its immediate dependencies to identify **ALL** violations of the architectural mandates outlined in this and associated skills.
+
+### A. The "Upfront Comprehensive Analysis" Rule
+
+At the beginning of any refactoring task, you **MUST** present the user with a comprehensive list of all identified architectural violations. This includes, but is not limited to:
+*   Illegitimate Triggers (e.g., on standard objects).
+*   Inline SOQL queries outside of a Selector class.
+*   Inline DML outside of a Domain or Unit of Work context.
+*   Redundant `Queueable` wrapper classes that could be replaced by native asynchronous Actions.
+*   Missing `without sharing` on classes that perform sharing calculations.
+*   Any other violation of Separation of Concerns.
+
+After presenting the full list, you **MUST** ask the user to confirm the scope of the current task. For example:
+> "I have identified the following architectural violations: [List of Violations]. Would you like me to address all of these as part of the current refactoring task, or should I focus only on [Initial Violation] for now?"
+
+### B. The "Persistent Backlog" Rule
+
+If the user chooses to limit the scope of the current task, you **MUST** maintain a "persistent backlog" by creating or updating a file named **`ARCHITECTURAL_DEBT.md`** in the project root.
+
+Upon successful completion of the user's requested, limited-scope task, you **MUST** present the list of remaining violations from the backlog file again and ask for permission to address them. For example:
+> "I have successfully refactored the legacy trigger. However, the following architectural violations remain in the `ARCHITECTURAL_DEBT.md` file: [List of Remaining Violations]. Would you like me to proceed with fixing these now?"
+
+At the beginning of any new session, you must check for the existence of `ARCHITECTURAL_DEBT.md` and, if it contains open items, present them to the user for prioritization.
+
 # Salesforce Platform Enterprise Architecture (AT4DX)
 
 This skill provides the architectural framework and procedural guidance for implementing large-scale Salesforce applications using the **Apex Enterprise Patterns** (fflib) and **AT4DX** standards.
