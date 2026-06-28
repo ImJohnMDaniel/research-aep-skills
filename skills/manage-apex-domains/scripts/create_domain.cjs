@@ -210,25 +210,6 @@ async function run() {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         });
 
-        const newInstanceBlock = `    public static ${interfaceName} newInstance(List<${sObjectName}> records)
-    {
-        return (${interfaceName}) Application.Domain.newInstance(records);
-    }
-
-    public static ${interfaceName} newInstance(Set<Id> recordIds)
-    {
-        return (${interfaceName}) Application.Domain.newInstance(recordIds);
-    }`;
-        const constructorClassBlock = `    public class Constructor
-        implements fflib_SObjectDomain.IConstructable
-    {
-        public fflib_SObjectDomain construct(List<SObject> sObjectList)
-        { 
-            return new ${className}(sObjectList);
-        }
-    }`;
-        const triggerHandlerBlock = `    fflib_SObjectDomain.triggerHandler(${className}.class);`;
-
         const supportsMR = isSupportedByMetadataRelationship(sObjectName);
         const bindingSObjectValue = supportsMR ? `<value xsi:type="xsd:string">${sObjectName}</value>` : `<value xsi:nil="true"/>`;
         const bindingSObjectAlternateValue = supportsMR ? `<value xsi:nil="true"/>` : `<value xsi:type="xsd:string">${sObjectName}</value>`;
@@ -256,9 +237,6 @@ async function run() {
 
         let changed = false;
         changed |= updateFile(paths.domain, "", domainTemplate);
-        // if (fs.existsSync(paths.domain)) updateFile(paths.domain, constructorClassBlock, domainTemplate);
-
-// TODO: Review these and are they still needed
         changed |= updateFile(paths.interface, "", interfaceTemplate);
         changed |= updateFile(paths.test, "", testTemplate);
         changed |= updateFile(paths.trigger, "", triggerTemplate);
