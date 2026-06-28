@@ -2,6 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const readline = require('readline');
 
 const sObjectName = process.argv[2];
 
@@ -146,6 +147,7 @@ async function run() {
         const testTemplateContent = fs.readFileSync(path.join(assetsDir, 'TestTemplate.cls'), 'utf8');
         const triggerTemplateContent = fs.readFileSync(path.join(assetsDir, 'TriggerTemplate.trigger'), 'utf8');
         const bindingTemplateContent = fs.readFileSync(path.join(assetsDir, 'BindingTemplate.xml'), 'utf8');
+        const uowBindingTemplateContent = fs.readFileSync(path.join(assetsDir, 'UOWBindingTemplate.xml'), 'utf8');
 
         console.log("--- Step 1: Live Verification of Base Dependencies ---");
         const learnScriptPath = path.join(__dirname, '../../learn-org-symbol-table/scripts/learn_symbols.cjs');
@@ -259,36 +261,120 @@ async function run() {
             }
         });
 
-        if (changed && !flags['no-deploy']) {
-            console.log("\nDeploying changes...");
-            try {
-                const deployOutput = execSync("sf project deploy start --ignore-conflicts --json", { encoding: 'utf8' });
-                const deployResult = JSON.parse(deployOutput);
-                if (deployResult.status === 0) {
-                    console.log("✔ Deployment Succeeded.");
-                } else {
-                    console.error("✖ Deployment Failed. Details:");
-                    console.error(JSON.stringify(deployResult.result, null, 2));
-                    process.exit(1);
-                }
-            } catch (error) {
-                console.error("✖ Deployment command failed to execute.");
-                try {
-                    const errorResult = JSON.parse(error.stdout);
-                    console.error(JSON.stringify(errorResult.result || errorResult, null, 2));
-                } catch (parseError) {
-                    console.error("Raw error output:", error.stdout || error.message);
-                }
-                process.exit(1);
-            }
-        } else if (changed) {
-            console.log("\nSkipping deployment due to --no-deploy flag.");
-        } else {
-            console.log("\nNo changes detected. Skipping deployment.");
-        }
+        
+        const uowBindingCreated = await checkAndCreateUoWBinding(sObjectName, uowBindingTemplateContent, bindingSObjectValue, bindingSObjectAlternateValue);
+        if(uowBindingCreated) changed = true;
+
+        await deployChanges(changed, flags);
+
     } catch (error) {
         console.error("Error:", error.message);
         process.exit(1);
+    }
+}
+
+async function checkAndCreateUoWBinding(sObjectName, template, bindingSObjectValue, bindingSObjectAlternateValue, flags) {
+    if (!sObjectName.endsWith('__c')) {
+        return false;
+    }
+
+    console.log(`\n--- Step 3: Checking Unit of Work Registration for ${sObjectName} ---`);
+
+    try {
+        const query = `SELECT Id FROM ApplicationFactory_UnitOfWorkBinding__mdt WHERE BindingSObject__c = '${sObjectName}' OR BindingSObjectAlternate__c = '${sObjectName}'`;
+        const resultJson = execSync(`sf data query -q "${query}" --json`).toString();
+        const result = JSON.parse(resultJson);
+
+        if (result.status === 0 && result.result.records.length > 0) {
+            console.log(`✔ ${sObjectName} is already registered in the Unit of Work sequence.`);
+            return false;
+        }
+
+        console.log(`❗ ${sObjectName} is not registered in the Unit of Work DML sequence.`);
+        
+        let sequence = flags['uow-sequence'];
+        let answer = 'y'; // Default to yes if running non-interactively
+
+        if (!sequence) {
+            const rl = readline.createInterface({
+                input: process.stdin,
+                output: process.stdout
+            });
+            const question = (query) => new Promise(resolve => rl.question(query, resolve));
+            answer = await question('This is required for DML operations via the Unit of Work. Would you like to register it now? (y/n) ');
+            
+            if (answer.toLowerCase() === 'y') {
+                while (!/^\d+$/.test(sequence)) {
+                    sequence = await question('Enter a unique DML sequence number (e.g., 2000): ');
+                }
+            }
+            rl.close();
+        } else {
+            if (!/^\d+$/.test(sequence)) {
+                console.error(`\nError: Invalid --uow-sequence value. Must be a number. Got: ${sequence}`);
+                process.exit(1);
+            }
+            console.log(`Using sequence number ${sequence} from --uow-sequence flag.`);
+        }
+        
+        if (answer.toLowerCase() !== 'y' || !sequence) {
+            console.log('Skipping Unit of Work registration. You will need to add it manually to perform DML.');
+            return false;
+        }
+        
+        const uowBindingName = sObjectName.replace('__c', '');
+        const uowBindingFileName = `ApplicationFactory_UnitOfWorkBinding.${uowBindingName}.md-meta.xml`;
+        
+        const sfdxProject = JSON.parse(fs.readFileSync("sfdx-project.json", "utf8"));
+        const defaultDir = sfdxProject.packageDirectories.find(d => d.default).path;
+        const uowBindingPath = path.join(defaultDir, "main", "schema", "customMetadata", "applicationFactoryBindings", "unitOfWorkBindings", uowBindingFileName);
+
+        const uowBindingContent = template
+            .replace(/{{SObjectName}}/g, sObjectName)
+            .replace(/{{BindingSObjectValue}}/g, bindingSObjectValue)
+            .replace(/{{BindingSObjectAlternateValue}}/g, bindingSObjectAlternateValue)
+            .replace(/{{BindingSequence}}/g, sequence);
+
+        const dir = path.dirname(uowBindingPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        
+        fs.writeFileSync(uowBindingPath, uowBindingContent);
+        console.log(` - Created Unit of Work Binding: ${uowBindingPath}`);
+        
+        return true; 
+    } catch (error) {
+        console.error('Error checking or creating Unit of Work binding:', error.message);
+        return false;
+    }
+}
+
+async function deployChanges(changed, flags) {
+    if (changed && !flags['no-deploy']) {
+        console.log("\nDeploying changes...");
+        try {
+            const deployOutput = execSync("sf project deploy start --ignore-conflicts --json", { encoding: 'utf8' });
+            const deployResult = JSON.parse(deployOutput);
+            if (deployResult.status === 0) {
+                console.log("✔ Deployment Succeeded.");
+            } else {
+                console.error("✖ Deployment Failed. Details:");
+                console.error(JSON.stringify(deployResult.result, null, 2));
+                process.exit(1);
+            }
+        } catch (error) {
+            console.error("✖ Deployment command failed to execute.");
+            try {
+                const errorResult = JSON.parse(error.stdout);
+                console.error(JSON.stringify(errorResult.result || errorResult, null, 2));
+            } catch (parseError) {
+                console.error("Raw error output:", error.stdout || error.message);
+            }
+            process.exit(1);
+        }
+    } else if (changed) {
+        console.log("\nSkipping deployment due to --no-deploy flag.");
+    } else {
+        console.log("\nNo changes detected. Skipping deployment.");
     }
 }
 

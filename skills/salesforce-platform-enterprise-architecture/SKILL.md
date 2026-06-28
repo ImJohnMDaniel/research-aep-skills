@@ -109,7 +109,28 @@ Follow this procedure:
 1.  **Service Layer**: Encapsulates business processes and orchestration.
 2.  **Domain Layer**: Encapsulates SObject-specific validation, defaults, and business logic. Managed via `manage-apex-domains`.  Apex Triggers should use the SObject's associated Domain class for all busines logic.
 3.  **Selector Layer**: Encapsulates SOQL queries, ensuring consistency and security. Managed via `manage-apex-selectors`.
-4.  **Unit of Work**: Manages transactionality and DML orchestration using `IApplicationSObjectUnitOfWork`.
+4.  **Unit of Work Layer**: Manages DML operations to ensure they are executed as a single, atomic transaction that can be rolled back on failure. All DML **MUST** be performed using this layer.
+
+    ### Unit of Work Mandates
+    There are two distinct and valid contexts for using the Unit of Work. You MUST identify the context you are in and use the correct pattern.
+
+    #### 1. Inside a Domain Process Action
+    When your code is inside a class that extends `DomainProcessAbstractAction`, the framework automatically manages the Unit of Work lifecycle for you.
+    - The `DomainProcessCoordinator` instantiates a `IApplicationSObjectUnitOfWork` and injects it into your action.
+    - You **MUST NOT** create a new Unit of Work instance.
+    - You **MUST NOT** call `commitWork()`.
+    - Your only responsibility is to register records with the provided instance: `this.uow.registerDirty(record);` or `this.uow.registerNew(record);`.
+
+    #### 2. Inside a Service or Domain Class
+    When your code is in a higher-level business logic class (like a Service method) that is NOT part of an automated trigger process, you are responsible for managing the transaction.
+    - You **MUST** manually instantiate a `IApplicationSObjectUnitOfWork` Unit of Work instance via `Application.UnitOfWork.newInstance()`.
+    - You **MUST** call `uow.commitWork();` at the end of your logic to save the changes to the database.
+
+    ### The DML Execution Sequence
+    The `ApplicationFactory_UnitOfWorkBinding__mdt` custom metadata type **DOES NOT** bind Apex classes. Its sole purpose is to define the global, application-wide DML execution order.
+    - To prevent runtime errors, any custom SObject that needs to be used in a Unit of Work **MUST** have a corresponding record in this metadata type defining its sequence in the transaction.
+    - Use the `get_uow_sequence.cjs` script to view the current order before adding a new binding.
+    - The `create_domain.cjs` script will automatically prompt you to create this binding when you create a new Domain for a custom SObject. For non-interactive execution, you can provide the `--uow-sequence=<Number>` flag.
 
 ## Architectural Mandates
 
@@ -136,6 +157,8 @@ To ensure safe and accurate execution, avoid the following common mistakes:
     -   **Correction:** Core framework syntax is non-negotiable. The `fflib_SObjectDomain.triggerHandler()` method requires a `System.Type` parameter (e.g., `MyDomain.class`), **NOT** an `SObjectType`. Before generating trigger code, you **MUST** consult the `TriggerTemplate.trigger` asset in the `manage-apex-domains` skill to ensure 100% correct syntax.
 -   **Anti-Pattern:** Creating or preserving separate `Queueable` Apex classes that are only called from a Domain Process Action.
     -   **Correction:** The `DomainProcessAbstractAction` class has native, built-in support for asynchronous execution. When you encounter logic that requires asynchronous processing (e.g., to prevent `MIXED_DML` errors), you **MUST** place that logic directly inside the `runInProcess()` method of the `Action` class. You will then set the `<ExecuteAsynchronous__c>true</ExecuteAsynchronous__c>` field in the corresponding `DomainProcessBinding__mdt` record. This eliminates the redundant wrapper class and leverages the framework's built-in capabilities. **Do not create a new `Queueable` class to be called by an `Action`.**
+-   **Anti-Pattern:** Performing inline DML operations (`insert`, `update`, `delete`, `undelete`).
+    -   **Correction:** All database modifications **MUST** be performed by registering records with a Unit of Work instance (`this.uow` in an Action, or a manually instantiated one in a Service/Domain). Direct DML calls bypass critical framework features like transaction management and are strictly forbidden. Refer to the "Unit of Work Layer" section for implementation details.
 
 ### Dependency Resolution and Mocking
 

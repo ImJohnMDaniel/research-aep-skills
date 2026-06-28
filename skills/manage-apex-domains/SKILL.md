@@ -257,6 +257,7 @@ These objects include, but are not limited to:
 - `ContentVersion`
 - `ContentDocument`
 - `ContentDocumentLink`
+- All "Share" objects related to a standard SObject or a custom SObject and the metadata API name ends with "Share"  (i.e. `AccountShare`, `EEORA_AccommRequest__Share`, etc. )
 
 When creating a `DomainProcessBinding__mdt` record for one of these SObjects, you **MUST NOT** populate the `RelatedDomainBindingSObject__c` field. Instead, you **MUST** populate the alternate text field, **`RelatedDomainBindingSObjectAlternate__c`**, with the SObject's API name as a string (e.g., `<value xsi:type="xsd:string">User</value>`). The script handles this for you.
 
