@@ -123,8 +123,31 @@ Your workflow is as follows:
     ```
 3.  **Verify:** After execution, verify that the new Apex class file has been created in the correct directories.
 
+### Using an Injectable Selector Method
 
+After creating your injectable method and its parameter class, you can execute it using the `selectInjection` method. This method is available on the base `IApplicationSObjectSelector` interface, allowing you to call it directly on an interface variable, which is the architectural best practice.
 
+**Correct Invocation Pattern:**
+1.  Obtain the selector by casting to its **specific interface** (e.g., `UCMN_IUsersSelector`).
+2.  Instantiate your method's parameters class.
+3.  Call `.selectInjection()` directly on the interface variable.
+
+**Correct Invocation Example:**
+```apex
+// In your Service, Domain, or Action class...
+
+// 1. Get the SELECTOR INTERFACE instance from the factory.
+UCMN_IUsersSelector usersSelector = (UCMN_IUsersSelector) Application.Selector.newInstance(User.SObjectType);
+
+// 2. Instantiate your injectable method's custom parameters class.
+MyInjectionParams params = new MyInjectionParams(someValues);
+
+// 3. Call 'selectInjection' directly on the interface variable.
+List<User> results = (List<User>) usersSelector.selectInjection(
+    MyInjectionMethod.class,
+    params
+);
+```
 
 ## Adding Custom Query Methods
 
