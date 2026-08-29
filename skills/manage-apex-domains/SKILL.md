@@ -87,14 +87,19 @@ Always refer to the `assets/TriggerTemplate.trigger` in this skill as the absolu
 ## Core Domain Management
 *Use this path ONLY if the deduction workflow in Step 1 determines the domain is managed locally by this project.*
 
-Generates or surgically updates the Domain class, Interface, Trigger, and Unit Test.
+Generates the Domain class, Interface, Trigger, and Unit Test scaffolding.
 
 1.  **Validation:** Checks if the SObject exists in the local project's metadata.
-2.  **Surgical Update / Creation:**
+2.  **Creation (create-only semantics):**
     *   If files don't exist, they are created from templates in the `assets/` folder.
-    *   If files exist (Domain, Interface, Trigger, Test), the skill surgically inserts required boilerplate (like `newInstance` methods or `Constructor` inner classes) while **preserving all existing methods and custom logic**.
-3.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}` convention (40-char limit), handling standard/custom objects appropriately.
-4.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
+    *   **The script never modifies existing files.** Files that already exist are skipped and reported as such.
+3.  **Reconciling Existing Files (YOUR responsibility as the agent):** When a Domain class, Interface, Trigger, or Test already exists (e.g., written before this skill was adopted), the script will not touch it. YOU must read the existing file and surgically add anything missing from this checklist, **preserving all existing methods and custom logic**:
+    *   **Domain class:** static `newInstance(List<{SObject}>)` and `newInstance(Set<Id>)` methods resolving through `Application.Domain`; a `Constructor` inner class implementing `fflib_SObjectDomain.IConstructable`; `extends ApplicationSObjectDomain`; implements its Domain interface. Compare against `assets/DomainTemplate.cls`.
+    *   **Interface:** extends `IApplicationSObjectDomain`.
+    *   **Trigger:** declares all 7 trigger scopes and delegates via `fflib_SObjectDomain.triggerHandler(<DomainClass>.class)` — compare against `assets/TriggerTemplate.trigger`.
+    *   **Binding:** an `ApplicationFactory_DomainBinding__mdt` record exists for the SObject, with `To__c` pointing at `<DomainClass>.Constructor`.
+4.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}` convention (40-char limit), handling standard/custom objects appropriately.
+5.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
 
 - **CRITICAL: Prefix Flag Mandate**
   If you are aware of the project's prefix (e.g., from `GEMINI.md`), you **MUST** provide it to the script via the `--prefix` flag. This is not optional. While the script can now infer the prefix in some cases, explicitly providing it ensures 100% correctness and adherence to project conventions.

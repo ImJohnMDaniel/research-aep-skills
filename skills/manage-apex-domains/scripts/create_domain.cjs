@@ -122,26 +122,17 @@ function isSupportedByMetadataRelationship(name) {
     return true;
 }
 
-function updateFile(filePath, content, templateIfMissing) {
+// Create-only semantics: the file is created from the template when missing.
+// Existing files are NEVER modified — reconciling an existing class with
+// current conventions is the agent's responsibility (see SKILL.md,
+// "Reconciling Existing Files").
+function createFileIfMissing(filePath, templateIfMissing) {
     if (!fs.existsSync(filePath)) {
         fs.writeFileSync(filePath, templateIfMissing);
         console.log(` - Created: ${filePath}`);
         return true;
     }
-    const existingContent = fs.readFileSync(filePath, "utf8");
-    if (existingContent.includes(content.trim())) {
-        console.log(` - Up to date: ${filePath}`);
-        return false;
-    }
-    if (filePath.endsWith(".cls") || filePath.endsWith(".trigger")) {
-        const lastBraceIndex = existingContent.lastIndexOf("}");
-        if (lastBraceIndex !== -1) {
-            const updated = existingContent.substring(0, lastBraceIndex) + "\n" + content + "\n" + existingContent.substring(lastBraceIndex);
-            fs.writeFileSync(filePath, updated);
-            console.log(` - Updated: ${filePath}`);
-            return true;
-        }
-    }
+    console.log(` - Exists, skipped (existing files are never modified): ${filePath}`);
     return false;
 }
 
@@ -244,10 +235,10 @@ async function run() {
         console.log(`--- Step 2: Creating/Updating Domain Artifacts for ${sObjectName} ---`);
 
         let changed = false;
-        changed |= updateFile(paths.domain, "", domainTemplate);
-        changed |= updateFile(paths.interface, "", interfaceTemplate);
-        changed |= updateFile(paths.test, "", testTemplate);
-        changed |= updateFile(paths.trigger, "", triggerTemplate);
+        changed |= createFileIfMissing(paths.domain, domainTemplate);
+        changed |= createFileIfMissing(paths.interface, interfaceTemplate);
+        changed |= createFileIfMissing(paths.test, testTemplate);
+        changed |= createFileIfMissing(paths.trigger, triggerTemplate);
 
         if (!fs.existsSync(paths.binding)) {
             fs.writeFileSync(paths.binding, bindingTemplate);

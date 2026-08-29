@@ -121,43 +121,18 @@ function isSupportedByMetadataRelationship(name) {
     return true;
 }
 
-function updateFile(filePath, content, templateIfMissing) {
+// Create-only semantics: the file is created from the template when missing.
+// Existing files are NEVER modified — reconciling an existing class with
+// current conventions is the agent's responsibility (see SKILL.md,
+// "Reconciling Existing Files"). A deterministic field-list refresh mode is
+// tracked separately (issue #28).
+function createFileIfMissing(filePath, templateIfMissing) {
     if (!fs.existsSync(filePath)) {
         fs.writeFileSync(filePath, templateIfMissing);
         console.log(` - Created: ${filePath}`);
         return true;
     }
-    let existingContent = fs.readFileSync(filePath, "utf8");
-    
-    // Check if we are updating the field list specifically
-    if (content.includes("getSObjectFieldList")) {
-        const fieldListRegex = /public List<Schema.SObjectField> getSObjectFieldList\(\s*\{([\s\S]*?)\}/;
-        if (fieldListRegex.test(existingContent)) {
-            const updatedContent = existingContent.replace(fieldListRegex, content.trim());
-            if (updatedContent !== existingContent) {
-                fs.writeFileSync(filePath, updatedContent);
-                console.log(` - Updated field list: ${filePath}`);
-                return true;
-            }
-            console.log(` - Field list up to date: ${filePath}`);
-            return false;
-        }
-    }
-
-    if (existingContent.includes(content.trim())) {
-        console.log(` - Up to date: ${filePath}`);
-        return false;
-    }
-
-    if (filePath.endsWith(".cls")) {
-        const lastBraceIndex = existingContent.lastIndexOf("}");
-        if (lastBraceIndex !== -1) {
-            const updated = existingContent.substring(0, lastBraceIndex) + "\n" + content + "\n" + existingContent.substring(lastBraceIndex);
-            fs.writeFileSync(filePath, updated);
-            console.log(` - Updated: ${filePath}`);
-            return true;
-        }
-    }
+    console.log(` - Exists, skipped (existing files are never modified): ${filePath}`);
     return false;
 }
 
@@ -272,14 +247,9 @@ async function run() {
         console.log(`Processing selector artifacts for ${sObjectName}:`);
 
         let changed = false;
-        changed |= updateFile(paths.selector, "", selectorTemplate);
-        // Ensure field list is updated even if file exists
-        if (fs.existsSync(paths.selector)) {
-            changed |= updateFile(paths.selector, "", selectorTemplate);
-        }
-
-        changed |= updateFile(paths.interface, "", interfaceTemplate);
-        changed |= updateFile(paths.test, "", testTemplate);
+        changed |= createFileIfMissing(paths.selector, selectorTemplate);
+        changed |= createFileIfMissing(paths.interface, interfaceTemplate);
+        changed |= createFileIfMissing(paths.test, testTemplate);
 
         if (!fs.existsSync(paths.binding)) {
             fs.writeFileSync(paths.binding, bindingTemplate);

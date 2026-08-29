@@ -68,14 +68,19 @@ This custom metadata type is used via the Force-DI dependency injection framewor
 ## Core Selector Management
 *Use this path ONLY if the deduction workflow in Step 1 determines the selector is managed locally by this project.*
 
-Generates or surgically updates the Selector class, Interface, and Unit Test.
+Generates the Selector class, Interface, and Unit Test scaffolding.
 
 1.  **Validation:** Checks if the SObject exists in the local project's metadata.
-2.  **Surgical Update / Creation:**
+2.  **Creation (create-only semantics):**
     *   If files don't exist, they are created from templates in the `assets/` folder.
-    *   If files exist (Selector, Interface, Test), the skill surgically inserts required boilerplate (like `newInstance` methods) while **preserving all existing methods and custom logic**.
-3.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}Selector` convention (40-char limit), handling standard/custom objects appropriately.
-4.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
+    *   **The script never modifies existing files.** Files that already exist are skipped and reported as such.
+3.  **Reconciling Existing Files (YOUR responsibility as the agent):** When a Selector class, Interface, or Test already exists (e.g., written before this skill was adopted), the script will not touch it. YOU must read the existing file and surgically add anything missing from this checklist, **preserving all existing methods and custom logic**:
+    *   **Selector class:** static `newInstance()` method resolving through `Application.Selector`; `extends ApplicationSObjectSelector`; implements its Selector interface; `getSObjectFieldList()`, `getSObjectType()`, and `selectById(Set<Id>)`. Compare against `assets/SelectorTemplate.cls`.
+    *   **Interface:** extends `IApplicationSObjectSelector` and declares `selectById(Set<Id>)`.
+    *   **Binding:** an `ApplicationFactory_SelectorBinding__mdt` record exists for the SObject, with `To__c` pointing at the Selector class.
+    *   **Field-list currency:** as the schema grows, new fields must be added to `getSObjectFieldList()` or queries will silently omit them. Until a deterministic refresh mode exists (issue #28), keeping this list current is a manual reconciliation task — compare the list against the SObject's describe when working on a selector.
+4.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}Selector` convention (40-char limit), handling standard/custom objects appropriately.
+5.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
 
 - **CRITICAL: Prefix Flag Mandate**
   If you are aware of the project's prefix (e.g., from `GEMINI.md`), you **MUST** provide it to the script via the `--prefix` flag. This is not optional. While the script can now infer the prefix in some cases, explicitly providing it ensures 100% correctness and adherence to project conventions.
