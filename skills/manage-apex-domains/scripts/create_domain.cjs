@@ -302,6 +302,11 @@ async function checkAndCreateUoWBinding(sObjectName, template, bindingSObjectVal
         let answer = 'y'; // Default to yes if running non-interactively
 
         if (!sequence) {
+            if (!process.stdin.isTTY) {
+                console.log('No interactive terminal detected and no --uow-sequence flag provided.');
+                console.log('Skipping Unit of Work registration. Re-run with --uow-sequence=<Number> to register (use get_uow_sequence.cjs to view the current order).');
+                return false;
+            }
             const rl = readline.createInterface({
                 input: process.stdin,
                 output: process.stdout

@@ -56,9 +56,10 @@ for (let i = 0; i < args.length; i++) {
 
 const isNonInteractive = !!(flags.group && flags.ops);
 
-// AGENT SAFETY CHECK: Ensure agent is running in non-interactive mode.
-if (process.env.IS_GEMINI_AGENT === 'true' && !isNonInteractive) {
-    console.error("AGENT_ERROR: This script must be run non-interactively by an agent. Provide all required data using command-line flags (--group, --ops, --order, etc.).");
+// SAFETY CHECK: Without a terminal (agent or CI execution), interactive
+// prompts would hang forever. Fail fast with usage guidance instead.
+if (!process.stdin.isTTY && !isNonInteractive) {
+    console.error("Error: No interactive terminal detected. Provide all required data using command-line flags (--group, --ops, --order, etc.).");
     process.exit(1);
 }
 

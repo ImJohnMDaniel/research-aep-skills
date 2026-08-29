@@ -35,12 +35,6 @@ for (let i = 0; i < args.length; i++) {
 flags.selectorName = selectorName; // Add selectorName to flags for consistency
 
 
-// AGENT SAFETY CHECK: Prevent interactive mode for agents.
-if (process.env.IS_GEMINI_AGENT === 'true' && !flags.params) {
-    // In an agent context, we assume non-interaction, but params are common.
-    // This could be enhanced to require a flag confirming no params are needed.
-}
-
 function validateIdentifier(name, type) {
     if (name.length > 40) {
         throw new Error(`Generated ${type} name "${name}" (${name.length} chars) exceeds the 40-character limit for Apex class names. Please provide a shorter <ComponentName>.`);
