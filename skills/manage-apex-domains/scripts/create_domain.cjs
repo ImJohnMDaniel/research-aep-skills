@@ -273,7 +273,7 @@ async function run() {
     }
 }
 
-async function checkAndCreateUoWBinding(sObjectName, template, bindingSObjectValue, bindingSObjectAlternateValue, flags) {
+async function checkAndCreateUoWBinding(sObjectName, template, bindingSObjectValue, bindingSObjectAlternateValue) {
     if (!sObjectName.endsWith('__c')) {
         return false;
     }
