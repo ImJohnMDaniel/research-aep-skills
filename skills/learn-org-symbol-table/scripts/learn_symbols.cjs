@@ -14,6 +14,7 @@ async function run() {
     try {
         const args = process.argv.slice(2);
         let fetchAll = args.includes('--all');
+        let refresh = args.includes('--refresh');
         let patterns = args.filter(a => !a.startsWith('--'));
         let globPattern = args.find(a => args[args.indexOf(a) - 1] === '--pattern');
 
@@ -22,6 +23,7 @@ async function run() {
             console.log('  node learn_symbols.cjs <ClassName1> [ClassName2] ...');
             console.log('  node learn_symbols.cjs --pattern <RegexPattern>');
             console.log('  node learn_symbols.cjs --all');
+            console.log('  Add --refresh to re-fetch symbol tables that are already stored locally.');
             return;
         }
 
@@ -52,26 +54,27 @@ async function run() {
         const orgId = orgInfo.result.id;
         console.log(`Querying org: ${orgId} (${orgInfo.result.alias || orgInfo.result.username})`);
 
-        // 3. Construct Query
-        let whereClause = `Name NOT IN (${Array.from(localClassNames).map(n => `'${n}'`).join(',')})`;
-        
+        // 3. Construct Query. Local classes are excluded in JavaScript below —
+        // embedding them in a NOT IN clause produces invalid SOQL when the
+        // project has no classes and can exceed query-length limits on large
+        // projects.
+        let whereClause = null;
+
         if (globPattern) {
             // Convert glob-style wildcard '*' to SOQL LIKE wildcard '%'
             const likePattern = globPattern.replace(/\*/g, '%');
-            whereClause += ` AND Name LIKE '${likePattern}'`;
+            whereClause = `Name LIKE '${likePattern}'`;
         } else if (patterns.length > 0) {
-            whereClause += ` AND Name IN (${patterns.map(p => `'${p}'`).join(',')})`;
+            whereClause = `Name IN (${patterns.map(p => `'${p}'`).join(',')})`;
         } else if (fetchAll) {
             console.log('Warning: The --all flag can be slow or fail on orgs with many classes. Consider using the --pattern flag for better performance.');
         }
 
         console.log('Fetching ApexClass metadata from org...');
-        const queryResult = JSON.parse(execSync(`sf data query --query "SELECT Id, Name FROM ApexClass WHERE ${whereClause}" --use-tooling-api --json`, { encoding: 'utf8' }));
-        
-        let classesToQuery = queryResult.result.records;
+        const soql = `SELECT Id, Name FROM ApexClass${whereClause ? ` WHERE ${whereClause}` : ''}`;
+        const queryResult = JSON.parse(execSync(`sf data query --query "${soql}" --use-tooling-api --json`, { encoding: 'utf8' }));
 
-        // The globPattern is now handled by the more efficient SOQL query, 
-        // so the secondary JavaScript filter is no longer needed.
+        let classesToQuery = queryResult.result.records.filter(r => !localClassNames.has(r.Name));
 
         console.log(`Found ${classesToQuery.length} matching classes in org that are NOT in the local project.`);
 
@@ -89,12 +92,17 @@ async function run() {
         // 5. Query SymbolTable for each class
         for (const apexClass of classesToQuery) {
             try {
+                const outputPath = path.join(storageDir, `${apexClass.Name}.json`);
+                if (!refresh && fs.existsSync(outputPath)) {
+                    console.log(`Cached: ${apexClass.Name} (already stored; use --refresh to re-fetch).`);
+                    continue;
+                }
                 process.stdout.write(`Fetching SymbolTable for ${apexClass.Name}... `);
                 const symbolResult = JSON.parse(execSync(`sf data query --query "SELECT SymbolTable FROM ApexClass WHERE Id = '${apexClass.Id}'" --use-tooling-api --json`, { encoding: 'utf8' }));
                 
                 const symbolTable = symbolResult.result.records[0].SymbolTable;
                 if (symbolTable) {
-                    fs.writeFileSync(path.join(storageDir, `${apexClass.Name}.json`), JSON.stringify(symbolTable, null, 2));
+                    fs.writeFileSync(outputPath, JSON.stringify(symbolTable, null, 2));
                     console.log('Done.');
                 } else {
                     console.log('No SymbolTable available.');
