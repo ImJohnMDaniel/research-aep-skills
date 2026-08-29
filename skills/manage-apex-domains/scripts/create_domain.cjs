@@ -78,6 +78,12 @@ function getPlural(name) {
         pluralBase = baseName + "s";
     }
 
+    // Special handling for __Share which becomes Shares — without this, the
+    // __Share domain name collides with the base SObject's domain class name
+    if (suffix === "__Share") {
+        return baseName + "Shares";
+    }
+
     // Domain classes are just plural, keep original suffix
     return pluralBase;
 }
