@@ -228,12 +228,8 @@ async function run() {
             const orgMetadata = JSON.parse(fs.readFileSync(orgMetadataPath, 'utf8'));
 
             const orgFieldNames = orgMetadata.fields.map(f => f.name);
-            console.log('The path variable at REF-E is currently :: ', path);
-            console.log('The orgMetadata variable at REF-E is currently :: ', orgMetadata);
-            
+
             const localFieldsPath = path.join(defaultDir, 'main', 'schema', 'objects', sObjectName, 'fields');
-            console.log('The path variable at REF-F is currently :: ', path);
-            console.log('The localFieldsPath variable at REF-F is currently :: ', localFieldsPath);
 
             let localFieldNames = [];
             if (fs.existsSync(localFieldsPath)) {
