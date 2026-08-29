@@ -184,7 +184,7 @@ async function run() {
                 const existingBindings = fs.readdirSync(bindingDir);
                 existingBindings.forEach(file => {
                     const content = fs.readFileSync(path.join(bindingDir, file), 'utf8');
-                    const orderMatch = content.match(/<field>OrderOfExecution__c<\/field>\s*<value.*>(\d+\.\d+)/);
+                    const orderMatch = content.match(/<field>OrderOfExecution__c<\/field>\s*<value.*>(\d+(?:\.\d+)?)/);
                     if (orderMatch) {
                         const order = parseFloat(orderMatch[1]);
                         if (Math.floor(order) === processGroup && order > highestDecimal) {
@@ -194,17 +194,52 @@ async function run() {
                 });
             }
 
-            const nextOrder = highestDecimal === 0 ? `${processGroup}.1` : (Math.floor(highestDecimal) + (Math.round((highestDecimal % 1) * 10) / 10) + 0.1).toFixed(1);
+            // Suggest the next 0.1 step within the process group. If that step
+            // would cross into the next integer (e.g. 10.9 -> 11.0), there is no
+            // safe suggestion — the caller must supply an explicit in-group order
+            // (finer steps like 10.95 are valid OrderOfExecution__c values).
+            let nextOrder = null;
+            if (highestDecimal === 0) {
+                nextOrder = `${processGroup}.1`;
+            } else {
+                const candidate = Math.round((highestDecimal + 0.1) * 10) / 10;
+                if (Math.floor(candidate) === processGroup) {
+                    nextOrder = candidate.toFixed(1);
+                }
+            }
 
             if (isNonInteractive) {
-                finalOrder = flags.order ? parseFloat(flags.order) : parseFloat(nextOrder);
+                if (flags.order) {
+                    finalOrder = parseFloat(flags.order);
+                } else if (nextOrder !== null) {
+                    finalOrder = parseFloat(nextOrder);
+                } else {
+                    console.error(`Error: Process group ${processGroup} already has a binding at order ${highestDecimal}; the next 0.1 step would leave the group.`);
+                    console.error(`Provide an explicit in-group value via --order (e.g., ${highestDecimal}5).`);
+                    process.exit(1);
+                }
                 if (isNaN(finalOrder)) {
                     console.error("Error: --order must be a valid number.");
                     process.exit(1);
                 }
+                if (Math.floor(finalOrder) !== processGroup) {
+                    console.error(`Error: --order ${finalOrder} is not within process group ${processGroup} (the integer part groups bindings into a process).`);
+                    process.exit(1);
+                }
             } else {
-                finalOrder = await askQuestion(`Suggested execution order is ${nextOrder}. Press Enter to accept or enter a different value: `) || nextOrder;
+                const promptText = nextOrder !== null
+                    ? `Suggested execution order is ${nextOrder}. Press Enter to accept or enter a different value: `
+                    : `Highest order in group ${processGroup} is ${highestDecimal}; enter an explicit in-group value (e.g., ${highestDecimal}5): `;
+                finalOrder = await askQuestion(promptText) || nextOrder;
                 finalOrder = parseFloat(finalOrder);
+                if (isNaN(finalOrder)) {
+                    console.error("Error: execution order must be a valid number.");
+                    process.exit(1);
+                }
+                if (Math.floor(finalOrder) !== processGroup) {
+                    console.error(`Error: order ${finalOrder} is not within process group ${processGroup} (the integer part groups bindings into a process).`);
+                    process.exit(1);
+                }
 
                 const triggerOpsAnswer = await askQuestion("Enter Trigger Operation(s) (comma-separated, e.g., After_Insert,After_Update): ");
                 triggerOperations = triggerOpsAnswer.split(',').map(op => op.trim()).filter(Boolean);
@@ -238,15 +273,16 @@ async function run() {
                 // Get the abbreviation for the current operation, or use the full name as a fallback.
                 const abbreviatedOp = opAbbreviations[operation] || operation;
 
-                // 2. Extract the prefix (e.g., "EEORA") from the full component name.
-                const prefix = componentName.split('_')[0];
-
-                // 3. Get the core part of the class name that needs to be abbreviated.
-                const classNameToAbbreviate = componentName.substring(prefix.length + 1);
+                // 2. Split the component name into prefix and core. A component
+                // name without an underscore has no prefix.
+                const underscoreIndex = componentName.indexOf('_');
+                const prefix = underscoreIndex > 0 ? componentName.substring(0, underscoreIndex) : '';
+                const classNameToAbbreviate = underscoreIndex > 0 ? componentName.substring(underscoreIndex + 1) : componentName;
 
                 // 4. Calculate the maximum length available for the class name part.
-                // Formula: 40 - (prefix + underscore + abbreviation + underscore)
-                const maxClassNameLength = 40 - prefix.length - 1 - abbreviatedOp.length - 1;
+                // Formula: 40 - (prefix + underscore, when present) - (underscore + abbreviation)
+                const prefixOverhead = prefix ? prefix.length + 1 : 0;
+                const maxClassNameLength = 40 - prefixOverhead - abbreviatedOp.length - 1;
 
                 // Abbreviate the class name part by truncating it if it's too long.
                 const abbreviatedClassName = classNameToAbbreviate.length > maxClassNameLength
@@ -254,7 +290,9 @@ async function run() {
                     : classNameToAbbreviate;
 
                 // 5. Construct the final binding name using your specified convention.
-                const bindingName = `${prefix}_${abbreviatedClassName}_${abbreviatedOp}`;
+                const bindingName = prefix
+                    ? `${prefix}_${abbreviatedClassName}_${abbreviatedOp}`
+                    : `${abbreviatedClassName}_${abbreviatedOp}`;
 
                 // --- END: Custom Naming Convention Logic ---
 
@@ -264,7 +302,7 @@ async function run() {
                     .replace(/<label>REPLACE_ME<\/label>/, `<label>${bindingName}</label>`)
                     .replace(/<field>ClassToInject__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>ClassToInject__c</field>\n        <value xsi:type="xsd:string">${componentName}</value>`)
                     .replace(/<field>Description__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>Description__c</field>\n        <value xsi:type="xsd:string">${descriptionValue} during ${operation}</value>`)
-                    .replace(/<field>OrderOfExecution__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>OrderOfExecution__c</field>\n        <value xsi:type="xsd:double">${finalOrder.toFixed(1)}</value>`)
+                    .replace(/<field>OrderOfExecution__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>OrderOfExecution__c</field>\n        <value xsi:type="xsd:double">${finalOrder}</value>`)
                     .replace(/<field>RelatedDomainBindingSObjectAlternate__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:type="xsd:string">${sObjectName}</value>`)
                     .replace(/<field>TriggerOperation__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>TriggerOperation__c</field>\n        <value xsi:type="xsd:string">${operation}</value>`);
 
