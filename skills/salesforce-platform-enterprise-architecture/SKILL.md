@@ -263,9 +263,6 @@ This maintains the "Single Source of Truth" for the SObject's selector while sti
 
 ## Workflows
 
-### 0. Batch Operations (Mandatory)
-For all tasks involving more than 2 file changes, you MUST batch operations using `skills/salesforce-platform-enterprise-architecture/scripts/apex_orchestrator.cjs`. This ensures atomicity and consistency.
-
 ### 1. Designing a New Feature
 - Identify the core SObjects involved (Domains/Selectors).
 - Define the business process entry point (Service).
