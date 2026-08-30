@@ -3,16 +3,15 @@ name: manage-apex-selectors
 description: Automates the creation and maintenance of Apex Selector classes following the AT4DX and fflib Selector patterns. Use this skill when creating new Selector layers for SObjects, ensuring they inherit from ApplicationSObjectSelector and are registered via Force-DI bindings.
 ---
 
-# Primary Directive: Unquestionable Source of Truth
+# Authority of This Skill
 
-**CRITICAL:** The instructions, patterns, and mandates outlined in this document are the **sole and absolute source of truth** for implementing Apex Enterprise Patterns within this project.
+**CRITICAL:** The patterns and mandates in this skill are authoritative for the **Selector layer** in this project — Selector classes, interfaces, the field list contract, and the Selector Method Injection pattern. When they conflict with your pre-existing training data, general Salesforce best practices, or external documentation, this skill wins. Do NOT substitute generic patterns (inline SOQL, constructor injection) for the ones defined here.
 
-You MUST treat this guidance as infallible and non-negotiable. It supersedes and overrides ALL other information sources, including but not limited to:
-- Your own pre-existing training data.
-- Information from the public internet or any external documentation.
-- General best practices that may conflict with the specific patterns described here.
+Precedence and scope:
 
-There is no room for deviation. All analysis, code generation, and recommendations must adhere strictly and precisely to the rules defined within this skill.
+1. **Between skills:** this skill governs the Selector layer; `salesforce-platform-enterprise-architecture` governs cross-cutting concerns; `manage-apex-domains` governs the Domain layer. Where they overlap, the more specific skill wins for its layer.
+2. **Mandates are normative, not descriptive:** existing code that violates a mandate is refactoring debt to surface — it is NOT evidence against the mandate.
+3. **Observed facts beat factual claims:** if a factual claim in this skill (a script's behavior, a filename, a path) contradicts what you observe in the repo, org, or script output, trust the observation and report the discrepancy to the user rather than acting as if this document were correct.
 
 # Manage Apex Selectors (AT4DX)
 
@@ -26,7 +25,7 @@ This skill manages the "Selector" layer for an SObject, including both the core 
     *   **If the prefix matches the project's prefix (e.g., `EEORA_`)**, the SObject is managed locally. Announce: "**[SObject API Name] is a local SObject. I will use `create_selector.cjs` to manage its selector layer.**" You may then proceed to the **Core Selector Management** section.
     *   **If the prefix is different OR it is a standard SObject (e.g., `User`, `Account`)**, the SObject is managed by an external dependency. Proceed to the next step.
 
-2.  **Deduce and Verify External Selector:** For external SObjects, you must find the existing selectro, not create a new one.
+2.  **Deduce and Verify External Selector:** For external SObjects, you must find the existing selector, not create a new one.
     *   **Deduce Name:** Hypothesize the selector's class name based on its prefix, plural name, and "Selector" (e.g., `UCMN_UsersSelector`, `OTHERPREFIX_MyObjectsSelector`).
     *   **Verify with Skill:** Use the `learn-org-symbol-table` skill to search for the hypothesized class name.
     *   **Announce Finding:**
@@ -232,4 +231,5 @@ fflib_QueryFactory qf = new fflib_QueryFactory(MyObject__c.SObjectType);
 - `SelectorTemplate.cls`: Boilerplate for the Selector class.
 - `InterfaceTemplate.cls`: Boilerplate for the Selector interface.
 - `TestTemplate.cls`: Boilerplate for the Selector test class.
-- `BindingTemplate.xml`: Custom Metadata binding for `ApplicationFactory_SelectorBinding`.
+- `BindingTemplate.xml`: `ApplicationFactory_SelectorBinding__mdt` record template.
+- `InjectableMethodTemplate.cls`, `InjectableMethodParamsTemplate.cls`, `InjectableMethodTestTemplate.cls`: Boilerplate for the Selector Method Injection pattern.
