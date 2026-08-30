@@ -113,6 +113,26 @@ function enforceLimit(name, suffix = "") {
     return prefix + remainder.substring(0, availableSpace) + testSuffix;
 }
 
+// The generated getSObjectFieldList() is the selector's "field list contract
+// to the org" (see xdocs/adr/0004): fields guaranteed available on every
+// query. The default contract excludes types that would inflate the heap on
+// every query — those are selected per query method via fflib_QueryFactory.
+const MAX_DEFAULT_CONTRACT_FIELDS = 40;
+
+function isContractEligibleOrgField(field) {
+    if (field.calculated) return false;                                // formula fields
+    if (field.type === 'base64') return false;                         // blobs
+    if (field.type === 'textarea' && field.length > 255) return false; // long / rich text areas
+    return true;
+}
+
+function isContractEligibleLocalField(fieldFileContent) {
+    if (/<formula>/.test(fieldFileContent)) return false;
+    const typeMatch = fieldFileContent.match(/<type>([\s\S]*?)<\/type>/);
+    const type = typeMatch ? typeMatch[1].trim() : '';
+    return type !== 'LongTextArea' && type !== 'Html';
+}
+
 function isSupportedByMetadataRelationship(name) {
     if (name.endsWith("__c") || name.endsWith("__pc")) return true;
     const unsupported = ["User", "PermissionSet", "PermissionSetGroup"];
@@ -202,7 +222,7 @@ async function run() {
             
             const orgMetadata = JSON.parse(fs.readFileSync(orgMetadataPath, 'utf8'));
 
-            const orgFieldNames = orgMetadata.fields.map(f => f.name);
+            const orgFieldNames = orgMetadata.fields.filter(isContractEligibleOrgField).map(f => f.name);
 
             const localFieldsPath = path.join(defaultDir, 'main', 'schema', 'objects', sObjectName, 'fields');
 
@@ -212,13 +232,22 @@ async function run() {
                 for (const file of localFieldFiles) {
                     const fileContent = fs.readFileSync(path.join(localFieldsPath, file), 'utf8');
                     const match = fileContent.match(/<fullName>([\s\S]*?)<\/fullName>/);
-                    if (match && match[1]) {
+                    if (match && match[1] && isContractEligibleLocalField(fileContent)) {
                         localFieldNames.push(match[1].trim());
                     }
                 }
             }
-            explicitFields = [...new Set([...orgFieldNames, ...localFieldNames])];
-            console.log(`Found ${explicitFields.length} total fields.`);
+            let curatedFields = [...new Set([...orgFieldNames, ...localFieldNames])];
+
+            if (curatedFields.length > MAX_DEFAULT_CONTRACT_FIELDS) {
+                const hasNameField = orgMetadata.fields.some(f => f.name === 'Name');
+                console.warn(`WARNING: ${curatedFields.length} contract-eligible fields found for ${sObjectName}, exceeding the recommended maximum of ${MAX_DEFAULT_CONTRACT_FIELDS}.`);
+                console.warn(`The selector will be created with ${hasNameField ? 'Id and Name' : 'Id'} only. Declare the field list contract explicitly by re-running with --fields=<comma-separated list>, or add fields to getSObjectFieldList() afterward.`);
+                curatedFields = hasNameField ? ['Id', 'Name'] : ['Id'];
+            } else {
+                console.log(`Found ${curatedFields.length} contract-eligible fields (formula, long/rich text area, and blob fields are excluded from the default contract).`);
+            }
+            explicitFields = curatedFields;
         }
 
         const fieldList = explicitFields ? explicitFields.map(f => `            ${sObjectName}.${f}`).join(",\n") : `            ${sObjectName}.Id,\n            ${sObjectName}.Name`;

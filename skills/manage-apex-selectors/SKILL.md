@@ -78,7 +78,7 @@ Generates the Selector class, Interface, and Unit Test scaffolding.
     *   **Selector class:** static `newInstance()` method resolving through `Application.Selector`; `extends ApplicationSObjectSelector`; implements its Selector interface; `getSObjectFieldList()`, `getSObjectType()`, and `selectById(Set<Id>)`. Compare against `assets/SelectorTemplate.cls`.
     *   **Interface:** extends `IApplicationSObjectSelector` and declares `selectById(Set<Id>)`.
     *   **Binding:** an `ApplicationFactory_SelectorBinding__mdt` record exists for the SObject, with `To__c` pointing at the Selector class.
-    *   **Field-list currency:** as the schema grows, new fields must be added to `getSObjectFieldList()` or queries will silently omit them. Until a deterministic refresh mode exists (issue #28), keeping this list current is a manual reconciliation task — compare the list against the SObject's describe when working on a selector.
+    *   **Field-list contract currency:** `getSObjectFieldList()` is the selector's field list contract to the org (see "The Field List Contract" below). When logic you are writing depends on a field, verify it is in the contract or explicitly select it in the query method via `newQueryFactory().selectField(...)`. A deterministic refresh mode is tracked in issue #28.
 4.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}Selector` convention (40-char limit), handling standard/custom objects appropriately.
 5.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
 
@@ -96,6 +96,16 @@ To generate or update a selector, run the bundled script:
   ```bash
   node ./scripts/create_selector.cjs MyObject__c --prefix=EEORA --fields=Id,Name,AccountNumber,Type
   ```
+
+### The Field List Contract
+
+`getSObjectFieldList()` is the selector's **field list contract to the org**: the list of fields the selector *guarantees* will be available on every record it returns. Any additional field a caller needs must be explicitly selected as part of the custom query method on a query-by-query basis (e.g., `newQueryFactory().selectField(MyObject__c.LongDescription__c)`). See `xdocs/adr/0004`.
+
+Default generation honors this contract philosophy:
+
+- When `--fields` is not provided, the script builds a curated contract from the org describe merged with local field metadata, **excluding** formula fields, long text areas, rich text areas, and blob fields — types that would inflate the heap on every query.
+- The generated contract is capped at **40 fields**. If more than 40 contract-eligible fields exist, the selector is created with `Id` and `Name` only, and the script warns that the contract must be declared manually.
+- A `--fields` list you provide is honored verbatim — it IS the contract you are declaring.
 
 ## Selector Method Injection (Modular Extension)
 *Use this path to add logic to an **existing** selector discovered in the Pre-flight Check.*
@@ -192,6 +202,7 @@ fflib_QueryFactory qf = new fflib_QueryFactory(MyObject__c.SObjectType);
 
 ## Architectural Mandates
 
+- **Field List Contract**: `getSObjectFieldList()` is the selector's guarantee of which fields are available on every query result. Keep it curated — no formula, long/rich text area, or blob fields by default, and no more than 40 fields. Fields outside the contract are explicitly selected per query method via `fflib_QueryFactory` (`newQueryFactory().selectField(...)`).
 - **Inheritance**: All Selector classes MUST inherit from `ApplicationSObjectSelector`.
 - **Interfaces**: All Selectors MUST implement a corresponding interface (e.g., `IAccountsSelector`) which extends `IApplicationSObjectSelector` when `at4dx` is present in the project's dependencies. If `at4dx` is not present, custom interfaces are optional but recommended.
 - **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
