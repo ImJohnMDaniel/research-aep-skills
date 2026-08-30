@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
 
 // --- Argument Parsing ---
 const componentName = process.argv[2];
@@ -9,7 +8,7 @@ const sObjectName = process.argv[3];
 const selectorName = process.argv[4]; // This is the selector name now
 
 if (!componentName || !sObjectName || !selectorName) {
-    console.error("Usage: node create_selector_method_injection.cjs <ComponentName> <SObjectName> <SelectorName> [--params=\"<Type1> <param1>, ...\"] [--no-deploy]");
+    console.error("Usage: node create_selector_method_injection.cjs <ComponentName> <SObjectName> <SelectorName> [--params=\"<Type1> <param1>, ...\"]");
     console.error("Example: node create_selector_method_injection.cjs EEORA_UsersByState User UCMN_UsersSelector --params=\"Set<String> states, Integer resultLimit\"");
     process.exit(1);
 }
@@ -175,32 +174,7 @@ async function run() {
             fs.writeFileSync(metaPath, metaContent);
         });
         
-        // --- 5. Deploy ---
-        if (!flags['no-deploy']) {
-            console.log("\nDeploying all new components...");
-            try {
-                const deployOutput = execSync("sf project deploy start --ignore-conflicts --json", { encoding: 'utf8' });
-                const deployResult = JSON.parse(deployOutput);
-                if (deployResult.status === 0) {
-                    console.log("✔ Deployment Succeeded.");
-                } else {
-                    console.error("✖ Deployment Failed. Details:");
-                    console.error(JSON.stringify(deployResult.result, null, 2));
-                    process.exit(1);
-                }
-            } catch (error) {
-                console.error("✖ Deployment command failed to execute.");
-                try {
-                    const errorResult = JSON.parse(error.stdout);
-                    console.error(JSON.stringify(errorResult.result || errorResult, null, 2));
-                } catch (parseError) {
-                    console.error("Raw error output:", error.stdout || error.message);
-                }
-                process.exit(1);
-            }
-        } else {
-            console.log("\nSkipping deployment as requested by --no-deploy flag. Please complete the implementation and deploy manually.");
-        }
+        console.log("\nGeneration complete. No deployment was performed — complete the implementation (including the TODO test-value assignments, which do not compile until filled in), then deploy the created paths explicitly (see SKILL.md, 'Deployment').");
 
     } catch (error) {
         console.error("Error:", error.message);

@@ -262,7 +262,11 @@ async function run() {
         const uowBindingCreated = await checkAndCreateUoWBinding(sObjectName, uowBindingTemplateContent, bindingSObjectValue, bindingSObjectAlternateValue);
         if(uowBindingCreated) changed = true;
 
-        await deployChanges(changed, flags);
+        if (changed) {
+            console.log("\nGeneration complete. No deployment was performed — complete the implementation, then deploy the created paths explicitly (see SKILL.md, 'Deployment').");
+        } else {
+            console.log("\nNo changes were made.");
+        }
 
     } catch (error) {
         console.error("Error:", error.message);
@@ -347,36 +351,6 @@ async function checkAndCreateUoWBinding(sObjectName, template, bindingSObjectVal
     } catch (error) {
         console.error('Error checking or creating Unit of Work binding:', error.message);
         return false;
-    }
-}
-
-async function deployChanges(changed, flags) {
-    if (changed && !flags['no-deploy']) {
-        console.log("\nDeploying changes...");
-        try {
-            const deployOutput = execSync("sf project deploy start --ignore-conflicts --json", { encoding: 'utf8' });
-            const deployResult = JSON.parse(deployOutput);
-            if (deployResult.status === 0) {
-                console.log("✔ Deployment Succeeded.");
-            } else {
-                console.error("✖ Deployment Failed. Details:");
-                console.error(JSON.stringify(deployResult.result, null, 2));
-                process.exit(1);
-            }
-        } catch (error) {
-            console.error("✖ Deployment command failed to execute.");
-            try {
-                const errorResult = JSON.parse(error.stdout);
-                console.error(JSON.stringify(errorResult.result || errorResult, null, 2));
-            } catch (parseError) {
-                console.error("Raw error output:", error.stdout || error.message);
-            }
-            process.exit(1);
-        }
-    } else if (changed) {
-        console.log("\nSkipping deployment due to --no-deploy flag.");
-    } else {
-        console.log("\nNo changes detected. Skipping deployment.");
     }
 }
 

@@ -80,7 +80,11 @@ Generates the Selector class, Interface, and Unit Test scaffolding.
     *   **Binding:** an `ApplicationFactory_SelectorBinding__mdt` record exists for the SObject, with `To__c` pointing at the Selector class.
     *   **Field-list contract currency:** `getSObjectFieldList()` is the selector's field list contract to the org (see "The Field List Contract" below). When logic you are writing depends on a field, verify it is in the contract or explicitly select it in the query method via `newQueryFactory().selectField(...)`. A deterministic refresh mode is tracked in issue #28.
 4.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}Selector` convention (40-char limit), handling standard/custom objects appropriately.
-5.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
+5.  **Deployment (YOUR responsibility as the agent — the script never deploys):** After generation, first complete the implementation (custom query methods, real test assertions — injectable-method tests generated with `--params` contain TODO assignments that do not compile until filled in), then deploy explicitly, scoped to the paths that were created or modified:
+    ```bash
+    sf project deploy start --source-dir <path> [--source-dir <path> ...] --json
+    ```
+    Do NOT use `--ignore-conflicts` — a source-tracking conflict is a signal to stop, inspect the conflicting components, and resolve deliberately, not to overwrite. See `xdocs/adr/0005`.
 
 - **CRITICAL: Prefix Flag Mandate**
   If you are aware of the project's prefix (e.g., from `GEMINI.md`), you **MUST** provide it to the script via the `--prefix` flag. This is not optional. While the script can now infer the prefix in some cases, explicitly providing it ensures 100% correctness and adherence to project conventions.

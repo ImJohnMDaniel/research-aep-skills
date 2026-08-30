@@ -99,7 +99,11 @@ Generates the Domain class, Interface, Trigger, and Unit Test scaffolding.
     *   **Trigger:** declares all 7 trigger scopes and delegates via `fflib_SObjectDomain.triggerHandler(<DomainClass>.class)` — compare against `assets/TriggerTemplate.trigger`.
     *   **Binding:** an `ApplicationFactory_DomainBinding__mdt` record exists for the SObject, with `To__c` pointing at `<DomainClass>.Constructor`.
 4.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}` convention (40-char limit), handling standard/custom objects appropriately.
-5.  **Auto-Deployment:** After files are ready, the skill automatically executes `sf project deploy start` to sync the changes to your default org.
+5.  **Deployment (YOUR responsibility as the agent — the script never deploys):** After generation, first complete the implementation (fill in skeleton logic in any generated Criteria/Action classes, real assertions in tests), then deploy explicitly, scoped to the paths that were created or modified:
+    ```bash
+    sf project deploy start --source-dir <path> [--source-dir <path> ...] --json
+    ```
+    Do NOT use `--ignore-conflicts` — a source-tracking conflict is a signal to stop, inspect the conflicting components, and resolve deliberately, not to overwrite. See `xdocs/adr/0005`.
 
 - **CRITICAL: Prefix Flag Mandate**
   If you are aware of the project's prefix (e.g., from `GEMINI.md`), you **MUST** provide it to the script via the `--prefix` flag. This is not optional. While the script can now infer the prefix in some cases, explicitly providing it ensures 100% correctness and adherence to project conventions.
