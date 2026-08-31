@@ -1,1 +1,5 @@
-{"name": "sf-aep-skills", "version": "1.0.0", "description": "Salesforce APEX Enterprise Patterns - Domain layer creation and Org symbol learning."}
+{
+    "name": "sf-aep-skills",
+    "version": "0.1.0",
+    "description": "Salesforce Apex Enterprise Patterns (fflib / Force-DI / AT4DX) skills: domain, selector, and architecture guidance with org-aware tooling."
+}

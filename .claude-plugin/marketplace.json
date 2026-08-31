@@ -1,0 +1,14 @@
+{
+    "name": "aep-skills",
+    "description": "Skills for building Salesforce applications with the Apex Enterprise Patterns frameworks (fflib-apex-common, fflib-apex-mocks, force-di, at4dx).",
+    "owner": {
+        "name": "John M. Daniel"
+    },
+    "plugins": [
+        {
+            "name": "sf-aep-skills",
+            "source": "./",
+            "description": "Salesforce Apex Enterprise Patterns (fflib / Force-DI / AT4DX) skills: domain, selector, and architecture guidance with org-aware tooling."
+        }
+    ]
+}

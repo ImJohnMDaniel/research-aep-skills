@@ -1,40 +1,41 @@
-# sf-aep-skills Extension: Distribution & Update Strategy
+# sf-aep-skills: Distribution & Update Strategy
 
-This document outlines the recommended approach for distributing the `sf-aep-skills` Gemini extension to developer teams and managing future updates.
+One platform-neutral repository (see `xdocs/adr/0002`) distributed through two thin adapters: a Claude Code plugin and a Gemini CLI extension. `build/lint_parity.cjs` enforces manifest parity and skill-content neutrality; run it before every release.
 
-## Distribution Methods
+## Installation
 
-| Method | Best For | Workflow |
-| :--- | :--- | :--- |
-| **Direct Git Install** | **Primary Method** for general distribution. | Teams run `gemini extensions install <gitlab-url>`. |
-| **Workspace-Scoped** | Project-specific mandatory tools. | Commit source to `.gemini/extensions/` in the target repo. |
-| **Pre-built Archive** | Performance-optimized installs. | Host `.tar.gz` archives on GitLab Releases. |
+### Claude Code (plugin)
 
-### 1. Git-based Installation (Recommended)
-Leverage the existing GitLab Enterprise infrastructure. The CLI uses the local system's `git` binary, respecting established SSH or PAT credentials.
+The repo carries its own single-plugin marketplace (`.claude-plugin/marketplace.json`):
 
-*   **Installation Command:**
-    ```bash
-    gemini extensions install git@gitlab.yourcompany.com:group/sf-aep-skills.git
-    ```
-*   **Version Control:** Use the `--ref` flag to pin to specific tags or branches:
-    *   `--ref v1.0.0` (Stable releases)
-    *   `--ref develop` (Beta testing)
+```
+/plugin marketplace add ImJohnMDaniel/research-aep-skills
+/plugin install sf-aep-skills@aep-skills
+```
 
-## Update & Maintenance Workflow
+Local development / testing without installing:
 
-### Update Mechanism
-1.  **Manual Update:** Developers run `gemini extensions update sf-aep-skills`.
-2.  **Auto-Update:** Install with the `--auto-update` flag to enable background checks.
-3.  **Session Refresh:** Use `/skills reload` within the CLI to activate changes without a restart.
+```bash
+claude --plugin-dir /path/to/research-aep-skills
+```
 
-### Release Process
-*   **Versioning:** Adhere to Semantic Versioning (SemVer).
-*   **GitLab Tags:** Create tags in GitLab for every stable release.
-*   **Manifest:** Maintain the `gemini-extension.json` file with accurate versioning and dependency metadata.
-*   **CI/CD:** Utilize GitLab CI to validate Apex patterns and skill logic before merging to `main`.
+(`/reload-plugins` picks up edits without restarting.)
 
-## Implementation Considerations
-*   **Security Allowlist:** If restricted, add the GitLab domain to `security.allowedExtensions` in the global `settings.json`.
-*   **Authentication:** Ensure developers have SSH keys or PATs configured in their Git Credential Manager.
-*   **Configuration:** Use `gemini extensions config sf-aep-skills` for setting extension-specific environment variables.
+### Gemini CLI (extension)
+
+```bash
+gemini extensions install https://github.com/ImJohnMDaniel/research-aep-skills
+```
+
+Pin to a tag or branch with `--ref` (e.g., `--ref v0.1.0` for stable, `--ref experimental-claude` for development).
+
+## Update & Release Process
+
+- **Versioning:** Semantic Versioning, kept identical in `.claude-plugin/plugin.json` and `gemini-extension.json` (lint-enforced). Tag releases in git (`v0.1.0`).
+- **Updates:** Claude Code — `/plugin` marketplace update flows; Gemini — `gemini extensions update sf-aep-skills` (or install with `--auto-update`).
+- **Framework references:** regenerate deliberately via `build/generate_references.cjs` when bumping the pinned commits in `build/framework-sources.json` (see `xdocs/adr/0008`); review the diff like code.
+- **Pre-release checklist:** `node build/lint_parity.cjs` green; `node --check` on all scripts; generated references current against the pinned framework commits.
+
+## Future Home
+
+The repository transfers to github.com/apex-enterprise-patterns as it matures (see `xdocs/adr/0001`); install commands change owner only. Additional platforms (e.g., Grok Build) are adapters over the same skill core, per ADR-0002.

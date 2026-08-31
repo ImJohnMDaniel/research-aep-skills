@@ -1,0 +1,9 @@
+{
+    "name": "sf-aep-skills",
+    "version": "0.1.0",
+    "description": "Salesforce Apex Enterprise Patterns (fflib / Force-DI / AT4DX) skills: domain, selector, and architecture guidance with org-aware tooling.",
+    "author": {
+        "name": "John M. Daniel"
+    },
+    "repository": "https://github.com/ImJohnMDaniel/research-aep-skills"
+}
