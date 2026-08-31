@@ -1,0 +1,30 @@
+{
+    "description": "Pinned sources for bundled framework reference generation (see xdocs/adr/0008). Deploy order matters. Bump a 'commit' hash deliberately to regenerate references from newer framework source.",
+    "localCloneRoot": "..",
+    "frameworks": [
+        {
+            "name": "fflib-apex-mocks",
+            "repo": "https://github.com/apex-enterprise-patterns/fflib-apex-mocks",
+            "commit": "6889cc0",
+            "deployOrder": 1
+        },
+        {
+            "name": "fflib-apex-common",
+            "repo": "https://github.com/apex-enterprise-patterns/fflib-apex-common",
+            "commit": "485d304",
+            "deployOrder": 2
+        },
+        {
+            "name": "force-di",
+            "repo": "https://github.com/apex-enterprise-patterns/force-di",
+            "commit": "574d050",
+            "deployOrder": 3
+        },
+        {
+            "name": "at4dx",
+            "repo": "https://github.com/apex-enterprise-patterns/at4dx",
+            "commit": "8c109e4",
+            "deployOrder": 4
+        }
+    ]
+}

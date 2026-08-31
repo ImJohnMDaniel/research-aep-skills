@@ -16,3 +16,4 @@ Decisions of record for the AEP skills project. Conventions:
 | [0005](0005-agent-owns-deployment.md) | Generator scripts never deploy; the agent owns deployment | Accepted |
 | [0006](0006-no-batch-orchestrator.md) | No batch orchestrator; the agent orchestrates | Accepted |
 | [0007](0007-guidance-taxonomy-and-canon-rulings.md) | Guidance taxonomy and canon rulings | Accepted |
+| [0008](0008-bundled-framework-references.md) | Bundled framework references, generated from a build-time scratch org | Accepted |
