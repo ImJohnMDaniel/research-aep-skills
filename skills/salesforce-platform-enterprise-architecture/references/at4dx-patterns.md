@@ -18,7 +18,7 @@ This guide details the implementation of Apex Enterprise Patterns using the **AT
 - **Calling**: `IAccounts domain = (IAccounts) Application.Domain.newInstance(records);`
 
 ### Domain Process Injection (Advanced Pattern)
-Use this pattern to add logic to existing Domains, especially when the Domain class resides in a dependency package (like `universal-common`) and cannot be modified directly.
+Use this pattern to add logic to existing Domains, especially when the Domain class resides in another package that owns the SObject (such as the standard-SObjects manager declared in the project context file) and cannot be modified directly.
 
 #### Components
 1.  **Criteria**: Filters the initial record set to a qualified subset.
@@ -60,11 +60,11 @@ Generally speaking, inline SOQL queries should be avoided in favor of Selector c
   uow.commitWork();
   ```
 
-## Working with Dependency Packages (e.g., universal-common)
-If the project has a dependency on `universal-common` (prefix `UCMN`), most standard SObject selectors and domains already exist (e.g., `UCMN_AccountsSelector`, `UCMN_Accounts`).
+## Working with the Standard-SObjects Manager Package
+When the project context file's AEP Conventions declare that another package manages Standard SObjects (`CMN` in these examples — always meaning whatever the context file names), that package's selectors and domains for those SObjects already exist (e.g., `CMN_AccountsSelector`, `CMN_Accounts`).
 
 ### Discovery Workflow
-1.  **Deduce Name**: Based on the `UCMN` prefix and standard pluralization (e.g., `UCMN_UsersSelector`).
+1.  **Deduce Name**: Based on the owning package's prefix and standard pluralization (e.g., `CMN_UsersSelector`).
 2.  **Run the learn script**: `learn_symbols.cjs <DeducedName>` (from the `learn-org-symbol-table` skill) prints the class's API summary — served from its local cache when available, fetched from the org otherwise.
 3.  **Evaluate**: Inspect the printed summary to see existing methods/fields.
     - **Trigger Existence**: If a Domain class exists for an SObject, assume a corresponding trigger also exists for that SObject in that package.

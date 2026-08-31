@@ -9,7 +9,7 @@ This skill automates the discovery of Apex class structures (methods, variables,
 
 ## Workflow
 
-1.  **Selection:** Identify which classes or patterns (e.g., `UCMN_*`) you need to learn.
+1.  **Selection:** Identify which classes or patterns (e.g., `CMN_*`) you need to learn.
 2.  **Run the script:** It prints a compact API summary of each class to stdout — fetched from the org on first request, served from the local cache on subsequent runs (`--refresh` forces a re-fetch). **Running the script IS the read**; consume its output directly.
 3.  **Do not read the cache files directly.** They live in `.aep/cache/org-symbols/<OrgID>/`, which self-excludes from git (`.aep/.gitignore`); some platforms restrict agent file tools from reading git-ignored paths, so the script's stdout is the supported access path on all platforms.
 
@@ -34,13 +34,13 @@ node ./scripts/learn_symbols.cjs ClassName1 ClassName2
 **2. Targeted Pattern Search (Use if direct lookup fails)**
 ```bash
 # Fetch symbols using a narrow, specific pattern
-node ./scripts/learn_symbols.cjs --pattern "UCMN_*Users*"
+node ./scripts/learn_symbols.cjs --pattern "CMN_*Users*"
 ```
 
 **3. Broad Search (Avoid if Possible)**
 ```bash
 # Fetch symbols using a broad pattern (Can be very slow)
-node ./scripts/learn_symbols.cjs --pattern "UCMN_*"
+node ./scripts/learn_symbols.cjs --pattern "CMN_*"
 
 # Fetch all missing symbols from the org (Extremely slow, use with caution)
 node ./scripts/learn_symbols.cjs --all

@@ -17,20 +17,23 @@ Precedence and scope:
 
 This skill manages the "Selector" layer for an SObject, including both the core class structure and the **Selector Method Injection** pattern for modular extension, following the AT4DX architectural standard.
 
+**Example placeholders:** `ACME` stands for this project's prefix and `CMN` for the package that manages Standard SObjects — always meaning whatever the project context file's `## AEP Conventions` section declares (see the `salesforce-platform-enterprise-architecture` skill), never literal names.
+
 ## Mandatory Selector Workflow
 
-**CRITICAL:** Before creating or extending any Selector layer, you MUST follow this workflow to determine if the Selector is managed locally or by a dependency. Failure to do so is a critical architectural violation.
+**CRITICAL:** Before creating or extending any Selector layer, you MUST resolve which package owns the SObject (Single-Ownership Principle — see the `salesforce-platform-enterprise-architecture` skill, "Resolving an SObject's owner"). Failure to do so is a critical architectural violation.
 
-1.  **Analyze SObject Prefix:** Examine the API name of the SObject in question.
-    *   **If the prefix matches the project's prefix (e.g., `EEORA_`)**, the SObject is managed locally. Announce: "**[SObject API Name] is a local SObject. I will use `create_selector.cjs` to manage its selector layer.**" You may then proceed to the **Core Selector Management** section.
-    *   **If the prefix is different OR it is a standard SObject (e.g., `User`, `Account`)**, the SObject is managed by an external dependency. Proceed to the next step.
+1.  **Resolve the SObject's owner:**
+    *   **Prefix matches the project's prefix (e.g., `ACME_`)** → the SObject is managed locally. Announce: "**[SObject API Name] is a local SObject. I will use `create_selector.cjs` to manage its selector layer.**" You may then proceed to the **Core Selector Management** section.
+    *   **Another package's prefix, or a standard SObject whose declared manager (per the project context file's AEP Conventions) is another package** → the SObject is owned elsewhere. Proceed to the next step.
+    *   **Standard SObject with no declared manager** → ownership is **unclaimed**: stop and ask the developer whether this project should own it (then treat it as local) or another package will.
 
-2.  **Deduce and Verify External Selector:** For external SObjects, you must find the existing selector, not create a new one.
-    *   **Deduce Name:** Hypothesize the selector's class name based on its prefix, plural name, and "Selector" (e.g., `UCMN_UsersSelector`, `OTHERPREFIX_MyObjectsSelector`).
+2.  **Deduce and Verify the Owning Package's Selector:** For SObjects owned elsewhere, you must find the existing selector, not create a new one.
+    *   **Deduce Name:** Hypothesize the selector's class name based on the owner's prefix, the plural name, and "Selector" (e.g., `CMN_UsersSelector` from the standard-SObjects manager, `OTHERPREFIX_MyObjectsSelector`).
     *   **Verify with Skill:** Use the `learn-org-symbol-table` skill to search for the hypothesized class name.
     *   **Announce Finding:**
         *   If the class is found, announce: "**Verified that the external selector [Verified Class Name] exists. I will use the Selector Method Injection pattern to extend it.**" You may then proceed to the **Selector Method Injection** section.
-        *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local selector for an external SObject.
+        *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local selector for an SObject owned elsewhere.
 
 ### Framework API References (Bundled)
 
@@ -45,7 +48,7 @@ This skill bundles generated, provenance-stamped API references for the framewor
 #### Bundled custom metadata type references
 * `references/at4dx/ApplicationFactory_SelectorBinding__mdt.md` — maps selector classes to their respective SObject via Force-DI and configures how the Application.Selector factory manages the selector implementations.
 
-Use the `learn-org-symbol-table` / `learn-org-metadata` skills only for what is NOT bundled — dependency-package classes (e.g., `UCMN_*`), project classes, and project SObject schemas — or to verify a bundled reference against the org when you suspect drift. If the org disagrees with a bundled reference, trust the org and report the discrepancy.
+Use the `learn-org-symbol-table` / `learn-org-metadata` skills only for what is NOT bundled — dependency-package classes (e.g., `CMN_*`), project classes, and project SObject schemas — or to verify a bundled reference against the org when you suspect drift. If the org disagrees with a bundled reference, trust the org and report the discrepancy.
 
 ## Core Selector Management
 *Use this path ONLY if the deduction workflow in Step 1 determines the selector is managed locally by this project.*
@@ -80,7 +83,7 @@ To generate or update a selector, run the bundled script:
 
   Example:
   ```bash
-  node ./scripts/create_selector.cjs MyObject__c --prefix=EEORA --fields=Id,Name,AccountNumber,Type
+  node ./scripts/create_selector.cjs MyObject__c --prefix=ACME --fields=Id,Name,AccountNumber,Type
   ```
 
 ### The Field List Contract
@@ -96,7 +99,7 @@ Default generation honors this contract philosophy:
 ## Selector Method Injection (Modular Extension)
 *Use this path to add logic to an **existing** selector discovered in the Pre-flight Check.*
 
-This is the architecturally correct pattern for adding custom query logic to a Selector from a dependency package (e.g., adding a query to `UCMN_UsersSelector`).
+This is the architecturally correct pattern for adding custom query logic to a Selector owned by another package (e.g., adding a query to `CMN_UsersSelector`, the standard-SObjects manager's selector).
 
 
 ### Creating Injections with `create_selector_method_injection.cjs` (Agent Workflow)
@@ -106,9 +109,9 @@ This is the architecturally correct pattern for adding custom query logic to a S
 Your workflow is as follows:
 
 1.  **Determine Parameters:** Before execution, you must determine the values for the following parameters:
-    *   `ComponentName`: The name for the new Apex class (e.g., `EEORA_MyNewSelectorMethod`).
+    *   `ComponentName`: The name for the new Apex class (e.g., `ACME_MyNewSelectorMethod`).
     *   `SObjectName`: The API name of the SObject being targeted (e.g., `User`, `Account`).
-    *   `SelectorName`: The name of the existing Apex selector class (e.g., `UCMN_UsersSelector`).
+    *   `SelectorName`: The name of the existing Apex selector class (e.g., `CMN_UsersSelector`).
 
 2.  **Construct and Execute Command:** Assemble the final command using the non-interactive flags.
 
@@ -120,7 +123,7 @@ Your workflow is as follows:
     **Example:**
     ```bash
     # This command creates a Selector Method class non-interactively.
-    node ./scripts/create_selector_method_injection.cjs EEORA_MyNewSelectorMethod User UCMN_UsersSelector
+    node ./scripts/create_selector_method_injection.cjs ACME_MyNewSelectorMethod User CMN_UsersSelector
     ```
 3.  **Verify:** After execution, verify that the new Apex class file has been created in the correct directories.
 
@@ -129,7 +132,7 @@ Your workflow is as follows:
 After creating your injectable method and its parameter class, you can execute it using the `selectInjection` method. This method is available on the base `IApplicationSObjectSelector` interface, allowing you to call it directly on an interface variable, which is the architectural best practice.
 
 **Correct Invocation Pattern:**
-1.  Obtain the selector by casting to its **specific interface** (e.g., `UCMN_IUsersSelector`).
+1.  Obtain the selector by casting to its **specific interface** (e.g., `CMN_IUsersSelector`).
 2.  Instantiate your method's parameters class.
 3.  Call `.selectInjection()` directly on the interface variable.
 
@@ -138,7 +141,7 @@ After creating your injectable method and its parameter class, you can execute i
 // In your Service, Domain, or Action class...
 
 // 1. Get the SELECTOR INTERFACE instance from the factory.
-UCMN_IUsersSelector usersSelector = (UCMN_IUsersSelector) Application.Selector.newInstance(User.SObjectType);
+CMN_IUsersSelector usersSelector = (CMN_IUsersSelector) Application.Selector.newInstance(User.SObjectType);
 
 // 2. Instantiate your injectable method's custom parameters class.
 MyInjectionParams params = new MyInjectionParams(someValues);
@@ -205,9 +208,9 @@ fflib_QueryFactory qf = new fflib_QueryFactory(MyObject__c.SObjectType);
 - **One Selector, One SObject**: A Selector class is strictly responsible for querying a single SObject. It is a critical anti-pattern for a selector to query another SObject's data, even if it is a related child or parent. Instead, you must invoke the appropriate selector for that object. For example, `AccountSelector` must not query for `Contact` records; it must call `ContactsSelector.newInstance()`. This is enforced by ensuring any call to `newQueryFactory(SomeObject__c.SObjectType)` uses an SObject type that matches the selector's own `getSObjectType()`.
 
 - **Naming Conventions**:
-  - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `EEORA_AccommRequestsSelector`)
-  - **Interface**: `{Prefix}_I{PluralSObjectName}Selector` (e.g., `EEORA_IAccommRequestsSelector`)
-  - **Selector Test Class**: `{Prefix}_{PluralSObjectName}SelectorTest` (e.g., `EEORA_AccommRequestsSelectorTest`)
+  - **Selector Class**: `{Prefix}_{PluralSObjectName}Selector` (e.g., `ACME_AccommRequestsSelector`)
+  - **Interface**: `{Prefix}_I{PluralSObjectName}Selector` (e.g., `ACME_IAccommRequestsSelector`)
+  - **Selector Test Class**: `{Prefix}_{PluralSObjectName}SelectorTest` (e.g., `ACME_AccommRequestsSelectorTest`)
 
 ## Resources
 

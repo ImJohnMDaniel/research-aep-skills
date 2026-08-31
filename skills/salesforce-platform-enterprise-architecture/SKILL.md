@@ -13,6 +13,36 @@ Precedence and scope:
 2. **Mandates are normative, not descriptive:** existing code that violates a mandate is refactoring debt to surface — it is NOT evidence against the mandate.
 3. **Observed facts beat factual claims:** if a factual claim in this skill (a script's behavior, a filename, a path) contradicts what you observe in the repo, org, or script output, trust the observation and report the discrepancy to the user rather than acting as if this document were correct.
 
+# Project Conventions and Hints (Ownership Resolution)
+
+## The Single-Ownership Principle
+
+**Exactly one package in the org's ecosystem manages any given SObject** (see `xdocs/adr/0007`). Ownership carries responsibility for that SObject's trigger, Domain class, and Selector class; every other package extends behavior via Domain Process Injection and Selector Method Injection. A trigger, Domain, or Selector is **legitimate only in the SObject's owning package**.
+
+## The AEP Conventions hint section
+
+The project declares the two facts that cannot be derived from code or org in a short section of its context file (`CLAUDE.md`/`GEMINI.md`):
+
+```markdown
+## AEP Conventions
+
+- Project prefix: ACME
+- Standard SObjects are managed by: CMN (common-core package)
+```
+
+- **Project prefix** — the prefix this project owns. Pass it to generator scripts via `--prefix`.
+- **Standard SObjects are managed by** — the prefix (optionally with package name) of the package responsible for standard SObjects. The value may be `this project` for a standalone project that owns them itself, or a mapping when ownership is split (e.g., `User, Task: CMN; Product2: PRICING`).
+
+**If the section is missing from the project context file, do not guess.** Ask the developer these two questions, then — with their confirmation — write the `## AEP Conventions` section into the project context file before proceeding.
+
+**Example placeholders:** throughout this skill and its companion skills, `ACME` stands for the project's own prefix and `CMN` for the package that manages Standard SObjects — always meaning *whatever the project context file declares*, never literal names.
+
+## Resolving an SObject's owner
+
+1. **Prefixed SObject:** the prefix names the owner — custom objects are self-describing. Prefix matches the project prefix → this project owns it. Any other prefix → that package owns it.
+2. **Standard SObject:** consult the `Standard SObjects are managed by` hint, then verify the owner's layer actually exists via the `learn-org-symbol-table` skill (deduce `<Prefix>_<PluralName>` / `<Prefix>_<PluralName>Selector`).
+3. **Mismatch or silence:** the hint names an owner but discovery finds nothing → report an architectural inconsistency. No hint claims the SObject and discovery finds no owner → ownership is **unclaimed**: stop and ask the developer whether this project should own it (a local trigger/Domain/Selector is then legitimate) or another package will.
+
 # II. The Holistic Refactoring Mandate
 
 When a refactoring or code review task is initiated, the agent **MUST** perform a holistic analysis of the target code and its immediate dependencies to identify **ALL** violations of the architectural mandates outlined in this and associated skills.
@@ -20,7 +50,7 @@ When a refactoring or code review task is initiated, the agent **MUST** perform 
 ### A. The "Upfront Comprehensive Analysis" Rule
 
 At the beginning of any refactoring task, you **MUST** present the user with a comprehensive list of all identified architectural violations. This includes, but is not limited to:
-*   Illegitimate Triggers (e.g., on standard objects).
+*   Illegitimate Triggers — triggers on SObjects this project does not own (see "Resolving an SObject's owner").
 *   Inline SOQL queries outside of a Selector class.
 *   Inline DML outside of a Domain or Unit of Work context.
 *   Redundant `Queueable` wrapper classes that could be replaced by native asynchronous Actions.
@@ -135,7 +165,7 @@ Follow this procedure:
 
 - **Separation of Concerns**: Never perform DML in Selectors. Never put complex business logic in Triggers.
 - **Dependency Injection**: Use the `Application` factory (Force-DI) to instantiate layers.
-- **Naming Conventions**: All classes MUST follow the project prefix (e.g., `EEORA_`).
+- **Naming Conventions**: All classes MUST follow the project prefix (e.g., `ACME_`).
 - **Interfaces**: All layers MUST be accessed via interfaces to support mock-based unit testing.
 
 ### Common Pitfalls & Agent Anti-Patterns
@@ -150,8 +180,8 @@ To ensure safe and accurate execution, avoid the following common mistakes:
     -   **Correction:** A failed read indicates a fundamental misunderstanding of the file system. Stop and debug the path.
 -   **Anti-Pattern:** Triggering a full package version creation (`sf package version create`) or package installation to resolve dependency compilation errors during source deployment.
     -   **Correction:** Packaging is a heavyweight, slow operation that is out of scope for local agent tasks and must be managed exclusively by the existing CI/CD system. 
--   **Anti-Pattern:** Refactoring a trigger on a standard or external SObject (e.g., `User`, `Account`).
-    -   **Correction:** Triggers on non-project SObjects are almost always redundant violations of the "one trigger per object" rule. The correct action is to recommend the trigger's **deletion** and migrate its logic into a Domain Process Injection that hooks into the official, shared trigger infrastructure. Do not attempt to "fix" or "refactor" a trigger that should not exist.
+-   **Anti-Pattern:** Refactoring a trigger on an SObject this project does not own (e.g., a `User` trigger when the project context file names another package as the standard-SObjects manager).
+    -   **Correction:** A trigger is legitimate only in the SObject's owning package. The correct action is to recommend the trigger's **deletion** and migrate its logic into a Domain Process Injection that hooks into the owning package's trigger infrastructure. Do not attempt to "fix" or "refactor" a trigger that should not exist. If ownership is unclaimed, ask the developer before acting.
 -   **Anti-Pattern:** Guessing or assuming the syntax of core framework methods like `fflib_SObjectDomain.triggerHandler`.
     -   **Correction:** Core framework syntax is non-negotiable. The `fflib_SObjectDomain.triggerHandler()` method requires a `System.Type` parameter (e.g., `MyDomain.class`), **NOT** an `SObjectType`. Before generating trigger code, you **MUST** consult the `TriggerTemplate.trigger` asset in the `manage-apex-domains` skill to ensure 100% correct syntax.
 -   **Anti-Pattern:** Creating or preserving separate `Queueable` Apex classes that are only called from a Domain Process Action.
@@ -216,43 +246,43 @@ To ensure safe and accurate execution, avoid the following common mistakes:
   ```
 
 
-### Project-Specific vs. Universal Components
+### Ownership of Components Across Packages
 
-A fundamental principle of this architecture is the separation of concerns between project-specific code and shared, universal components (often from dependency packages like `universal-common`).
+A fundamental principle of this architecture is the Single-Ownership Principle (see "Project Conventions and Hints" at the top of this skill): every SObject has exactly one owning package, and only the owner holds its trigger, Domain, and Selector.
 
--   **Project-Specific SObjects**: SObjects with the project's prefix (e.g., `EEORA_`) are managed directly by this project's skills.
--   **Standard & External SObjects**: Standard Salesforce SObjects (`Account`, `User`, etc.) or SObjects from other packages (`OtherPrefix__Object__c`) are considered "universal". You **MUST** assume that their corresponding Apex Enterprise Pattern layers (Domain, Selector) already exist in a shared dependency.
+-   **This project's SObjects** (prefix matches the project prefix, e.g. `ACME_`): managed directly by this project's skills.
+-   **SObjects owned elsewhere** (another package's prefix, or standard SObjects whose declared manager is another package): their Apex Enterprise Pattern layers live in the owning package. Resolve the owner per "Resolving an SObject's owner".
 
-**CRITICAL**: Before creating a new Domain or Selector for a standard or external SObject, you **MUST** use the `learn-org-symbol-table` skill to find and utilize the existing component (e.g., `UCMN_UsersSelector`). Creating a duplicate layer for a non-project SObject is a critical architectural violation.
+**CRITICAL**: Before creating a new Domain or Selector for an SObject this project does not own, you **MUST** resolve the owner and use the `learn-org-symbol-table` skill to find and utilize the existing component (e.g., `CMN_UsersSelector` from the standard-SObjects manager). Creating a duplicate layer for an SObject owned elsewhere is a critical architectural violation. If ownership is unclaimed, stop and ask the developer.
 
-**CRITICAL WORKFLOW FOR TRIGGERS**: When encountering an Apex Trigger, first determine the ownership of its SObject. If the SObject is standard or from another package, any trigger on it within the current project is considered **illegitimate**. The primary goal is its **removal**, not its refactoring. Migrate its logic into a Domain Process Injection and delete the trigger file.
+**CRITICAL WORKFLOW FOR TRIGGERS**: When encountering an Apex Trigger, first resolve the ownership of its SObject. A trigger is legitimate only in the SObject's owning package. If this project does not own the SObject, the trigger is **illegitimate** here — the primary goal is its **removal**, not its refactoring. Migrate its logic into a Domain Process Injection and delete the trigger file. If ownership is unclaimed, ask the developer before acting: a standalone project that owns the SObject may legitimately keep the trigger.
 
 ### Selector Discovery Workflow
 
-To efficiently and safely discover dependency selectors (like `UCMN_UsersSelector`), you MUST follow this sequence:
+To efficiently and safely discover dependency selectors (like `CMN_UsersSelector`), you MUST follow this sequence:
 
-1.  **Direct Name Search (Hypothesize)**: First, deduce the most likely selector name based on conventions (e.g., `UCMN_` + Plural SObject Name + `Selector`). Use `learn-org-symbol-table` with this exact name.
+1.  **Direct Name Search (Hypothesize)**: First, deduce the most likely selector name based on conventions (e.g., `CMN_` + Plural SObject Name + `Selector`). Use `learn-org-symbol-table` with this exact name.
     ```bash
     # Correct first step
-    node ./scripts/learn_symbols.cjs UCMN_UsersSelector
+    node ./scripts/learn_symbols.cjs CMN_UsersSelector
     ```
 2.  **Targeted Pattern Search (Broaden)**: If the direct search fails, broaden the search *slightly* with a targeted pattern that includes the SObject name.
     ```bash
     # Correct second step if the first fails
-    node ./scripts/learn_symbols.cjs --pattern "UCMN_*Users*"
+    node ./scripts/learn_symbols.cjs --pattern "CMN_*Users*"
     ```
 3.  **Broad Pattern Search (Last Resort)**: Only if both targeted searches fail, resort to a broader pattern. This is highly inefficient and should be avoided.
     ```bash
     # Incorrect: Do not do this unless absolutely necessary
-    node ./scripts/learn_symbols.cjs --pattern "UCMN_*"
+    node ./scripts/learn_symbols.cjs --pattern "CMN_*"
     ```
 
 ### Extending Dependency Layers: The "Read-Only Class" Problem
 
-A common and critical architectural challenge arises when you need to add a new query method to a Selector that comes from a dependency package (e.g., adding a new query to `UCMN_UsersSelector`). Because the class is read-only, you cannot modify it directly.
+A common and critical architectural challenge arises when you need to add a new query method to a Selector owned by another package (e.g., adding a new query to `CMN_UsersSelector`). Because the class is read-only, you cannot modify it directly.
 
 **The Anti-Pattern (DO NOT DO THIS):**
-The incorrect solution is to create a second, project-specific selector for the same SObject (e.g., `EEORA_UsersSelector`). This creates a "split brain" scenario where there are two sources of truth for queries, leading to confusion, code duplication, and maintenance issues.
+The incorrect solution is to create a second, project-specific selector for the same SObject (e.g., `ACME_UsersSelector`). This violates the Single-Ownership Principle and creates a "split brain" scenario where there are two sources of truth for queries, leading to confusion, code duplication, and maintenance issues.
 
 **The Correct Pattern: Selector Method Injection**
 The AT4DX framework provides an elegant solution called **Selector Method Injection**. This pattern allows you to write your custom query logic in a small, separate, "injectable" class within your local project. You can then execute this custom logic *through* the original, unmodified dependency selector.
@@ -274,7 +304,7 @@ This maintains the "Single Source of Truth" for the SObject's selector while sti
 - Move multi-object orchestration to **Services**.
 
 ### 3. Extending Existing Logic (Domain Process Injection)
-Use this pattern to add logic to existing Domains, especially those in dependency packages (like `universal-common`). Automated tools for this pattern are available in the **`manage-apex-domains`** skill.
+Use this pattern to add logic to existing Domains owned by other packages (such as the standard-SObjects manager declared in the project context file). Automated tools for this pattern are available in the **`manage-apex-domains`** skill.
 
 ## Working with Dependency Packages
 - **Redundancy**: If a redundant trigger exists, you MUST recommend **removing** it and using Domain Process Injection instead.

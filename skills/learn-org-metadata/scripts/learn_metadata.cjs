@@ -30,7 +30,7 @@ function renderDescribeSummary(describe) {
 /**
  * Usage:
  * node learn_metadata.cjs <SObjectName1> [SObjectName2] ...
- * node learn_metadata.cjs --pattern EEORA_*
+ * node learn_metadata.cjs --pattern ACME_*
  * node learn_metadata.cjs --all
  */
 

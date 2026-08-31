@@ -19,10 +19,10 @@ To fetch metadata for specific objects:
 
 ```bash
 # Fetch specific objects
-node ./scripts/learn_metadata.cjs Account EEORA_AccommRequest__c
+node ./scripts/learn_metadata.cjs Account ACME_AccommRequest__c
 
 # Fetch using a pattern
-node ./scripts/learn_metadata.cjs --pattern "EEORA_*"
+node ./scripts/learn_metadata.cjs --pattern "ACME_*"
 
 # Fetch all (Warning: Very slow)
 node ./scripts/learn_metadata.cjs --all

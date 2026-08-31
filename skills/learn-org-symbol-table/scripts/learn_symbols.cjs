@@ -54,7 +54,7 @@ function renderSymbolSummary(name, table) {
 /**
  * Usage:
  * node learn_symbols.cjs [ClassName1] [ClassName2] ...
- * node learn_symbols.cjs --pattern UCMN_*
+ * node learn_symbols.cjs --pattern CMN_*
  * node learn_symbols.cjs --all
  */
 

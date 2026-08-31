@@ -9,7 +9,7 @@ const selectorName = process.argv[4]; // This is the selector name now
 
 if (!componentName || !sObjectName || !selectorName) {
     console.error("Usage: node create_selector_method_injection.cjs <ComponentName> <SObjectName> <SelectorName> [--params=\"<Type1> <param1>, ...\"]");
-    console.error("Example: node create_selector_method_injection.cjs EEORA_UsersByState User UCMN_UsersSelector --params=\"Set<String> states, Integer resultLimit\"");
+    console.error("Example: node create_selector_method_injection.cjs ACME_UsersByState User CMN_UsersSelector --params=\"Set<String> states, Integer resultLimit\"");
     process.exit(1);
 }
 
@@ -139,7 +139,7 @@ async function run() {
 
         // --- 3. Generate Test Class ---
         // Derive interface name from concrete class name
-        // Example: UCMN_UsersSelector -> UCMN_IUsersSelector
+        // Example: CMN_UsersSelector -> CMN_IUsersSelector
         let selectorInterfaceName = selectorName;
         if (selectorName.includes('_')) {
             const parts = selectorName.split('_');

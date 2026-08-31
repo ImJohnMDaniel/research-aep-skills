@@ -17,20 +17,23 @@ Precedence and scope:
 
 This skill manages the "Domain" layer for an SObject, including both the core class structure and the **Domain Process Injection** pattern for modular extension, following the AT4DX architectural standard.
 
+**Example placeholders:** `ACME` stands for this project's prefix and `CMN` for the package that manages Standard SObjects — always meaning whatever the project context file's `## AEP Conventions` section declares (see the `salesforce-platform-enterprise-architecture` skill), never literal names.
+
 ## Mandatory Domain Workflow
 
-**CRITICAL:** Before creating or extending any Domain layer, you MUST follow this workflow to determine if the Domain is managed locally or by a dependency. Failure to do so is a critical architectural violation.
+**CRITICAL:** Before creating or extending any Domain layer, you MUST resolve which package owns the SObject (Single-Ownership Principle — see the `salesforce-platform-enterprise-architecture` skill, "Resolving an SObject's owner"). Failure to do so is a critical architectural violation.
 
-1.  **Analyze SObject Prefix:** Examine the API name of the SObject in question.
-    *   **If the prefix matches the project's prefix (e.g., `EEORA_`)**, the SObject is managed locally. Announce: "**[SObject API Name] is a local SObject. I will use `create_domain.cjs` to manage its domain layer.**" You may then proceed to the **Core Domain Management** section.
-    *   **If the prefix is different OR it is a standard SObject (e.g., `User`, `Account`)**, the SObject is managed by an external dependency. Proceed to the next step.
+1.  **Resolve the SObject's owner:**
+    *   **Prefix matches the project's prefix (e.g., `ACME_`)** → the SObject is managed locally. Announce: "**[SObject API Name] is a local SObject. I will use `create_domain.cjs` to manage its domain layer.**" You may then proceed to the **Core Domain Management** section.
+    *   **Another package's prefix, or a standard SObject whose declared manager (per the project context file's AEP Conventions) is another package** → the SObject is owned elsewhere. Proceed to the next step.
+    *   **Standard SObject with no declared manager** → ownership is **unclaimed**: stop and ask the developer whether this project should own it (then treat it as local) or another package will.
 
-2.  **Deduce and Verify External Domain:** For external SObjects, you must find the existing domain, not create a new one.
-    *   **Deduce Name:** Hypothesize the domain's class name based on its prefix and plural name (e.g., `UCMN_Users`, `OTHERPREFIX_MyObjects`).
+2.  **Deduce and Verify the Owning Package's Domain:** For SObjects owned elsewhere, you must find the existing domain, not create a new one.
+    *   **Deduce Name:** Hypothesize the domain's class name based on the owner's prefix and the plural name (e.g., `CMN_Users` from the standard-SObjects manager, `OTHERPREFIX_MyObjects`).
     *   **Verify with Skill:** Use the `learn-org-symbol-table` skill to search for the hypothesized class name.
     *   **Announce Finding:**
         *   If the class is found, announce: "**Verified that the external domain [Verified Class Name] exists. I will use the Domain Process Injection pattern to extend it.**" You may then proceed to the **Domain Process Injection** section.
-        *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local domain for an external SObject.
+        *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local domain for an SObject owned elsewhere.
 
 ### Framework API References (Bundled)
 
@@ -48,7 +51,7 @@ This skill bundles generated, provenance-stamped API references for the framewor
 * `references/at4dx/DomainProcessBinding__mdt.md` — maps domain criteria and action classes to their specific domain processes via Force-DI.
 * `references/at4dx/ApplicationFactory_UnitOfWorkBinding__mdt.md` — defines the org-wide Unit of Work DML execution sequence.
 
-Use the `learn-org-symbol-table` / `learn-org-metadata` skills only for what is NOT bundled — dependency-package classes (e.g., `UCMN_*`), project classes, and project SObject schemas — or to verify a bundled reference against the org when you suspect drift. If the org disagrees with a bundled reference, trust the org and report the discrepancy.
+Use the `learn-org-symbol-table` / `learn-org-metadata` skills only for what is NOT bundled — dependency-package classes (e.g., `CMN_*`), project classes, and project SObject schemas — or to verify a bundled reference against the org when you suspect drift. If the org disagrees with a bundled reference, trust the org and report the discrepancy.
 
 ### CRITICAL: Trigger Syntax
 The `fflib_SObjectDomain.triggerHandler` method is the only acceptable way to invoke domain logic from a trigger. Its syntax is precise and must be followed exactly.
@@ -91,7 +94,7 @@ To generate or update a domain, run the bundled script:
 
   Example:
   ```bash
-  node ./scripts/create_domain.cjs MyObject__c --prefix=EEORA
+  node ./scripts/create_domain.cjs MyObject__c --prefix=ACME
   ```
 
 ## Domain Process Injection (Modular Extension)
@@ -128,10 +131,10 @@ The `OrderOfExecution__c` field is the most important concept to understand. It 
 Your workflow is as follows:
 
 1.  **Determine Parameters:** Before execution, you must determine the values for the following parameters:
-    *   `ComponentName`: The name for the new Apex class (e.g., `EEORA_MyNewCriteria`).
+    *   `ComponentName`: The name for the new Apex class (e.g., `ACME_MyNewCriteria`).
     *   `SObjectName`: The API name of the SObject being targeted (e.g., `User`, `Account`).
     *   `Type`: The type of injection, either `Criteria` or `Action`.
-    *   `ProcessGroup`: The integer that groups this logic with other injections (e.g., `10`, `20`). You should analyze existing bindings in `sfdx-source/eeora/main/schema/customMetadata/domainProcessBindings/` to choose a logical group number.
+    *   `ProcessGroup`: The integer that groups this logic with other injections (e.g., `10`, `20`). You should analyze existing bindings in the `main/schema/customMetadata/domainProcessBindings/` folder under the default package directory declared in `sfdx-project.json` to choose a logical group number.
     *   `TriggerOps`: A comma-separated string of the trigger operations this injection applies to (e.g., `"After_Insert,After_Update"`).
     *   `Order`: The execution order number. You MUST calculate this by finding the highest existing order number within your chosen `ProcessGroup` and incrementing the decimal by 0.1. For example, if the highest existing order is `10.2`, your new order should be `10.3`.
 
@@ -145,7 +148,7 @@ Your workflow is as follows:
     **Example:**
     ```bash
     # This command creates a Criteria class and its binding metadata non-interactively.
-    node ./scripts/create_injection.cjs EEORA_UserIsActiveCriteria User Criteria --group 10 --ops "After_Update,After_Insert" --order 10.2
+    node ./scripts/create_injection.cjs ACME_UserIsActiveCriteria User Criteria --group 10 --ops "After_Update,After_Insert" --order 10.2
     ```
 3.  **Verify:** After execution, verify that the new Apex class and the corresponding `DomainProcessBinding__mdt.xml` file(s) have been created in the correct directories.
 
@@ -161,7 +164,7 @@ The interactive script will generate the necessary files for you. The following 
     <protected>false</protected>
     <values>
         <field>ClassToInject__c</field>
-        <value xsi:type="xsd:string">EEORA_UserActiveCriteria</value> <!-- The Criteria class -->
+        <value xsi:type="xsd:string">ACME_UserActiveCriteria</value> <!-- The Criteria class -->
     </values>
     <values>
         <field>IsActive__c</field>
@@ -199,7 +202,7 @@ The interactive script will generate the necessary files for you. The following 
     <protected>false</protected>
     <values>
         <field>ClassToInject__c</field>
-        <value xsi:type="xsd:string">EEORA_UserBklAction</value> <!-- The Action class -->
+        <value xsi:type="xsd:string">ACME_UserBklAction</value> <!-- The Action class -->
     </values>
     <values>
         <field>IsActive__c</field>
@@ -228,7 +231,7 @@ The interactive script will generate the necessary files for you. The following 
     ...
 </CustomMetadata>
 ```
-This configuration correctly tells the framework: "For `After_Update` on `User`, run Process 10. In this process, first evaluate `EEORA_UserActiveCriteria`. On the records that pass, evaluate `EEORA_UserBklAction`."
+This configuration correctly tells the framework: "For `After_Update` on `User`, run Process 10. In this process, first evaluate `ACME_UserActiveCriteria`. On the records that pass, evaluate `ACME_UserBklAction`."
 
 
 ### CRITICAL: Binding to SObjects with Metadata Relationship Limitations
@@ -240,7 +243,7 @@ These objects include, but are not limited to:
 - `ContentVersion`
 - `ContentDocument`
 - `ContentDocumentLink`
-- All "Share" objects related to a standard SObject or a custom SObject and the metadata API name ends with "Share"  (i.e. `AccountShare`, `EEORA_AccommRequest__Share`, etc. )
+- All "Share" objects related to a standard SObject or a custom SObject and the metadata API name ends with "Share"  (i.e. `AccountShare`, `ACME_AccommRequest__Share`, etc. )
 
 When creating a `DomainProcessBinding__mdt` record for one of these SObjects, you **MUST NOT** populate the `RelatedDomainBindingSObject__c` field. Instead, you **MUST** populate the alternate text field, **`RelatedDomainBindingSObjectAlternate__c`**, with the SObject's API name as a string (e.g., `<value xsi:type="xsd:string">User</value>`). The script handles this for you.
 
@@ -252,13 +255,13 @@ When creating a `DomainProcessBinding__mdt` record for one of these SObjects, yo
 - **Access**: Use the `newInstance()` static methods via the `Application.Domain` factory.
 - **Calling Domains**: Always call the domain's static `newInstance()` method directly within your business logic. Do not store domains as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
 - **Trigger Scopes**: All triggers MUST include all 7 scopes (after insert, after update, before insert, before update, after delete, before delete, after undelete).
-- **Injection Pattern**: Use Domain Process Injection to add logic to existing Domains, especially those in dependency packages (like `universal-common`).
+- **Injection Pattern**: Use Domain Process Injection to add logic to existing Domains owned by other packages (such as the standard-SObjects manager declared in the project context file).
 - **One Domain, One SObject**: A Domain class is strictly responsible for the business logic of a single SObject. It MUST NOT contain logic for other SObjects. To interact with other records, it must invoke their respective Domain or Service layers. For example, when an `Opportunity` is closed, its Domain class (`Opportunities`) should not directly create an `Order` record. Instead, it should call an `OrdersService` to handle the order creation process, thereby correctly separating the concerns.
 - **Naming Conventions**:
-  - **Domain Class**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
-  - **Interface**: `{Prefix}_I{PluralSObjectName}` (e.g., `EEORA_IAccommRequests`)
-  - **Domain Test Class**: `{Prefix}_{PluralSObjectName}Test` (e.g., `EEORA_AccommRequestsTest`)
-  - **Trigger**: `{Prefix}_{PluralSObjectName}` (e.g., `EEORA_AccommRequests`)
+  - **Domain Class**: `{Prefix}_{PluralSObjectName}` (e.g., `ACME_AccommRequests`)
+  - **Interface**: `{Prefix}_I{PluralSObjectName}` (e.g., `ACME_IAccommRequests`)
+  - **Domain Test Class**: `{Prefix}_{PluralSObjectName}Test` (e.g., `ACME_AccommRequestsTest`)
+  - **Trigger**: `{Prefix}_{PluralSObjectName}` (e.g., `ACME_AccommRequests`)
 
 ## Resources
 
