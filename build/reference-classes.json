@@ -1,0 +1,101 @@
+{
+    "description": "Curated reference-generation list (see xdocs/adr/0008). Scope = classes the SKILL.md files enumerate; grow this list as new skills name their classes. All names verified against framework source at the pinned hashes in framework-sources.json.",
+    "frameworks": {
+        "fflib-apex-mocks": {
+            "classes": [
+                "fflib_ApexMocks",
+                "fflib_Match",
+                "fflib_IDGenerator"
+            ]
+        },
+        "fflib-apex-common": {
+            "classes": [
+                "fflib_Application",
+                "fflib_IObjects",
+                "fflib_ISObjectDomain",
+                "fflib_ISObjectSelector",
+                "fflib_ISObjectUnitOfWork",
+                "fflib_ISObjects",
+                "fflib_Objects",
+                "fflib_QueryFactory",
+                "fflib_SObjectDomain",
+                "fflib_SObjectSelector",
+                "fflib_SObjectUnitOfWork",
+                "fflib_SObjects"
+            ]
+        },
+        "force-di": {
+            "classes": [
+                "di_Binding",
+                "di_Injector",
+                "di_Module"
+            ]
+        },
+        "at4dx": {
+            "classes": [
+                "AbstractSelectorMethodInjectable",
+                "AbstractSelectorQueryLocatorInjectable",
+                "Application",
+                "ApplicationSObjectDomain",
+                "ApplicationSObjectSelector",
+                "ApplicationSObjectUnitOfWork",
+                "DomainProcessAbstractAction",
+                "DomainProcessConstants",
+                "DomainProcessCoordinator",
+                "IApplicationSObjectDomain",
+                "IApplicationSObjectSelector",
+                "IApplicationSObjectUnitOfWork",
+                "IDomainProcessAction",
+                "IDomainProcessActionWithExistingRecs",
+                "IDomainProcessCriteria",
+                "IDomainProcessCriteriaWithExistingRecs",
+                "IDomainProcessQueueableAction",
+                "IDomainProcessWithParamsAction",
+                "IDomainProcessWithParamsCriteria",
+                "ISelectorMethodInjectable",
+                "ISelectorMethodParameterable",
+                "ISelectorMethodSetable",
+                "ISelectorQueryLocatorMethodInjectable"
+            ],
+            "metadataTypes": [
+                "ApplicationFactory_DomainBinding__mdt",
+                "ApplicationFactory_SelectorBinding__mdt",
+                "ApplicationFactory_ServiceBinding__mdt",
+                "ApplicationFactory_UnitOfWorkBinding__mdt",
+                "DomainProcessBinding__mdt"
+            ]
+        }
+    },
+    "skillMapping": {
+        "manage-apex-domains": [
+            "fflib_ISObjectDomain", "fflib_ISObjects", "fflib_IObjects",
+            "fflib_SObjectDomain", "fflib_SObjects", "fflib_Objects",
+            "ApplicationSObjectDomain", "IApplicationSObjectDomain",
+            "DomainProcessConstants", "DomainProcessAbstractAction", "DomainProcessCoordinator",
+            "IDomainProcessAction", "IDomainProcessActionWithExistingRecs",
+            "IDomainProcessQueueableAction", "IDomainProcessWithParamsAction",
+            "IDomainProcessCriteria", "IDomainProcessCriteriaWithExistingRecs",
+            "IDomainProcessWithParamsCriteria",
+            "Application",
+            "ApplicationFactory_DomainBinding__mdt", "DomainProcessBinding__mdt",
+            "ApplicationFactory_UnitOfWorkBinding__mdt"
+        ],
+        "manage-apex-selectors": [
+            "fflib_ISObjectSelector", "fflib_SObjectSelector", "fflib_QueryFactory",
+            "ApplicationSObjectSelector", "IApplicationSObjectSelector",
+            "AbstractSelectorMethodInjectable", "AbstractSelectorQueryLocatorInjectable",
+            "ISelectorMethodInjectable", "ISelectorMethodParameterable",
+            "ISelectorMethodSetable", "ISelectorQueryLocatorMethodInjectable",
+            "Application",
+            "ApplicationFactory_SelectorBinding__mdt"
+        ],
+        "salesforce-platform-enterprise-architecture": [
+            "fflib_Application", "Application",
+            "fflib_ISObjectUnitOfWork", "fflib_SObjectUnitOfWork",
+            "ApplicationSObjectUnitOfWork", "IApplicationSObjectUnitOfWork",
+            "ApplicationFactory_UnitOfWorkBinding__mdt",
+            "di_Injector", "di_Binding", "di_Module",
+            "fflib_ApexMocks", "fflib_Match", "fflib_IDGenerator"
+        ]
+    }
+}
