@@ -97,6 +97,8 @@ To generate or update a domain, run the bundled script:
   node ./scripts/create_domain.cjs MyObject__c --prefix=ACME
   ```
 
+- **Ownership guardrail:** the script refuses to scaffold a Domain for an SObject this project does not own — another package's prefixed SObject is always refused (extend via Domain Process Injection); a standard SObject is refused unless you pass `--confirm-ownership`, which you may do ONLY after the developer has confirmed this project owns it (see the ownership-resolution workflow above).
+
 ## Domain Process Injection (Modular Extension)
 *Use this path to add logic to an **existing** domain discovered in the Pre-flight Check.*
 

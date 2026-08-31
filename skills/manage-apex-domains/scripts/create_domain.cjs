@@ -51,8 +51,25 @@ if (!appPrefix) {
         console.log(`--prefix flag not provided. Inferred prefix "${appPrefix}" from SObject name.`);
     } else {
         // For standard objects or objects without a clear prefix, default to empty.
-        appPrefix = ""; 
+        appPrefix = "";
     }
+}
+
+// ARCHITECTURAL GUARDRAIL (Single-Ownership Principle, ADR-0007): a Domain may
+// be created only by the SObject's owning package.
+const sObjectIsCustomShaped = /__(c|pc|mdt|e|Share|History|ChangeEvent)$/.test(sObjectName);
+const sObjectPrefixMatch = sObjectName.match(/^([A-Za-z0-9]+)_.+__/);
+const sObjectPrefix = sObjectIsCustomShaped && sObjectPrefixMatch ? sObjectPrefixMatch[1] : null;
+
+if (!sObjectIsCustomShaped && !flags['confirm-ownership']) {
+    console.error(`ARCHITECTURAL GUARDRAIL: ${sObjectName} is a standard SObject. A Domain may be created only in the SObject's owning package.`);
+    console.error(`Resolve ownership first (project context file's AEP Conventions section + org discovery). If the owner is another package, extend it via Domain Process Injection instead. If the developer confirms THIS project owns ${sObjectName}, re-run with --confirm-ownership.`);
+    process.exit(1);
+}
+if (sObjectPrefix && appPrefix && sObjectPrefix !== appPrefix) {
+    console.error(`ARCHITECTURAL GUARDRAIL: ${sObjectName} carries prefix "${sObjectPrefix}", which is not this project's prefix ("${appPrefix}") — the SObject is owned by another package.`);
+    console.error(`Do not create a local Domain for it. Extend the owning package's domain via Domain Process Injection instead.`);
+    process.exit(1);
 }
 
 function getPlural(name) {

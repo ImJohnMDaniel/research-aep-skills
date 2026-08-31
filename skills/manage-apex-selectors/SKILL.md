@@ -86,6 +86,8 @@ To generate or update a selector, run the bundled script:
   node ./scripts/create_selector.cjs MyObject__c --prefix=ACME --fields=Id,Name,AccountNumber,Type
   ```
 
+- **Ownership guardrail:** the script refuses to scaffold a Selector for an SObject this project does not own — another package's prefixed SObject is always refused (extend via Selector Method Injection); a standard SObject is refused unless you pass `--confirm-ownership`, which you may do ONLY after the developer has confirmed this project owns it (see the ownership-resolution workflow above).
+
 ### The Field List Contract
 
 `getSObjectFieldList()` is the selector's **field list contract to the org**: the list of fields the selector *guarantees* will be available on every record it returns. Any additional field a caller needs must be explicitly selected as part of the custom query method on a query-by-query basis (e.g., `newQueryFactory().selectField(MyObject__c.LongDescription__c)`). See `xdocs/adr/0004`.

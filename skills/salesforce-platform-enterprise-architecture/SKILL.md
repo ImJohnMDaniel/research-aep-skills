@@ -293,17 +293,26 @@ This maintains the "Single Source of Truth" for the SObject's selector while sti
 
 ## Workflows
 
-### 1. Designing a New Feature
+### 1. Creating a New Custom SObject (Full Pattern Complement)
+Creating a project-owned custom SObject implies immediately establishing its full pattern complement **in the same task** (see `xdocs/adr/0007`, ruling 3) — object creation and layer scaffolding are one unit of work, not a follow-up:
+
+- Run `create_selector.cjs` (from `manage-apex-selectors`): Selector class + interface + unit test + `ApplicationFactory_SelectorBinding__mdt` record.
+- Run `create_domain.cjs` (from `manage-apex-domains`): Domain class + interface + unit test + the SObject's trigger + `ApplicationFactory_DomainBinding__mdt` record. Provide `--uow-sequence=<Number>` (run `get_uow_sequence.cjs` first to choose a free number) so the `ApplicationFactory_UnitOfWorkBinding__mdt` record is registered too.
+- Then complete the implementations and deploy explicitly (see the specialized skills' Deployment steps).
+
+**Auxiliary objects** (`__Share`, `__History`, `__ChangeEvent`, …) are the exception: create their layers only when the first query or logic for them arises — and always as their own dedicated classes, never folded into the primary SObject's layers.
+
+### 2. Designing a New Feature
 - Identify the core SObjects involved (Domains/Selectors).
 - Define the business process entry point (Service).
 - Map the data flow and transaction boundaries (Unit of Work).
 
-### 2. Refactoring Legacy Code
+### 3. Refactoring Legacy Code
 - Move SOQL from controllers/triggers to **Selectors**.
 - Move DML and business logic from triggers to **Domains**.
 - Move multi-object orchestration to **Services**.
 
-### 3. Extending Existing Logic (Domain Process Injection)
+### 4. Extending Existing Logic (Domain Process Injection)
 Use this pattern to add logic to existing Domains owned by other packages (such as the standard-SObjects manager declared in the project context file). Automated tools for this pattern are available in the **`manage-apex-domains`** skill.
 
 ## Working with Dependency Packages
