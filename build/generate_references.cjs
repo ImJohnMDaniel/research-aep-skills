@@ -197,7 +197,11 @@ function renderTableSection(table, depth) {
         ctors.forEach(c => { md += `- \`${signature(c, false)}\`\n`; });
         md += '\n';
     }
-    const props = [...(table.properties || []), ...(table.variables || [])].filter(p => isVisible(p.modifiers));
+    // SymbolTables list a property and its backing variable separately — dedupe by name.
+    const seenProps = new Set();
+    const props = [...(table.properties || []), ...(table.variables || [])]
+        .filter(p => isVisible(p.modifiers))
+        .filter(p => seenProps.has(p.name) ? false : seenProps.add(p.name));
     if (props.length) {
         md += `${h} Properties\n\n`;
         props.forEach(p => { md += `- \`${(p.modifiers || []).join(' ')}${(p.modifiers || []).length ? ' ' : ''}${p.type} ${p.name}\`\n`; });

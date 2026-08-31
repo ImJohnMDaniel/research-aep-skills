@@ -26,4 +26,5 @@ Design decisions:
 - The SKILL.md "learn these framework classes first" preambles become "read `references/…`" — skills get faster and usable before any org is connected.
 - `learn-org-symbol-table` / `learn-org-metadata` are demoted to their true purpose: org-specific discovery (dependency packages, project schema) and drift verification.
 - The build script (issue #20) needs a Dev Hub locally; framework API changes become visible as reference diffs at regeneration time.
+- Known fidelity limitation: the Tooling API erases generic type parameters in method *parameter* types (e.g., `Map existingRecords` rather than `Map<Id, SObject>`); method names, arity, and return types are full fidelity. Full parameter fidelity would require source parsing — deliberately not pursued (first run, 2026-08-30).
 - A shop on a diverged private clone sees exactly which upstream commits the references were cut from and relies on the drift rule for its delta.
