@@ -287,4 +287,12 @@ Use this pattern to add logic to existing Domains, especially those in dependenc
 - Use **`learn-org-symbol-table`** to discover Apex class structures from the org.
 
 ## References
+
 - [at4dx-patterns.md](references/at4dx-patterns.md): Detailed implementation guide.
+- **Bundled framework API references** (provenance-stamped, one file per class; see `xdocs/adr/0008`):
+  - Unit of Work: `references/fflib-apex-common/fflib_ISObjectUnitOfWork.md`, `fflib_SObjectUnitOfWork.md`; `references/at4dx/IApplicationSObjectUnitOfWork.md`, `ApplicationSObjectUnitOfWork.md`, `ApplicationFactory_UnitOfWorkBinding__mdt.md`
+  - Application factories: `references/fflib-apex-common/fflib_Application.md`; `references/at4dx/Application.md`
+  - Force-DI: `references/force-di/di_Injector.md`, `di_Binding.md`, `di_Module.md`
+  - ApexMocks: `references/fflib-apex-mocks/fflib_ApexMocks.md`, `fflib_Match.md`, `fflib_IDGenerator.md`
+
+  **Read the bundled reference before implementing against a framework class — do not work from memory.** Use `learn-org-symbol-table` only for classes not bundled (dependency-package and project classes) or to verify suspected drift; if the org disagrees with a bundled reference, trust the org and report the discrepancy.

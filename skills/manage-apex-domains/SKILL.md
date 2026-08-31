@@ -32,48 +32,23 @@ This skill manages the "Domain" layer for an SObject, including both the core cl
         *   If the class is found, announce: "**Verified that the external domain [Verified Class Name] exists. I will use the Domain Process Injection pattern to extend it.**" You may then proceed to the **Domain Process Injection** section.
         *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local domain for an external SObject.
 
-### Ensure Exact Understanding Of Classes, Interfaces, and Custom Metadata Types From AT4DX Framework Related to Apex Domains
+### Framework API References (Bundled)
 
-#### Apex Classes
-If you have not done so previously, use the `learn-org-symbol-table` skill and find the SymbolTables for the following Apex classes and review them thoroughly.  These classes are specifically related to AT4DX framework's management of Domain classes.  Note: The AT4DX Framework classes do not have a prefix.  Do not try to add on infer a prefix for these AT4DX classes mentioned here.
+This skill bundles generated, provenance-stamped API references for the framework classes and custom metadata types it relies on, under `references/fflib-apex-common/` and `references/at4dx/` — one markdown file per class (see `xdocs/adr/0008`). **Before implementing against any framework class, read its bundled reference file — do not work from memory.** Note: the framework classes have no prefix; do not infer one.
 
-##### Core Domain Class from the FFLIB Apex Common Framework
-* `fflib_ISobjectDomain`
-* `fflib_ISObjects`
-* `fflib_IObjects`
-* `fflib_SobjectDomain`
-* `fflib_SObjects`
-* `fflib_Objects`
+#### Bundled Apex class references
+* Core Domain classes (fflib-apex-common): `fflib_ISObjectDomain`, `fflib_ISObjects`, `fflib_IObjects`, `fflib_SObjectDomain`, `fflib_SObjects`, `fflib_Objects` — `references/fflib-apex-common/<ClassName>.md`
+* Core Domain classes (AT4DX): `ApplicationSObjectDomain`, `IApplicationSObjectDomain`, `DomainProcessConstants`, `DomainProcessCoordinator` — `references/at4dx/<ClassName>.md`
+* Domain Process Actions (AT4DX): `DomainProcessAbstractAction`, `IDomainProcessAction`, `IDomainProcessActionWithExistingRecs`, `IDomainProcessQueueableAction`, `IDomainProcessWithParamsAction`
+* Domain Process Criteria (AT4DX): `IDomainProcessCriteria`, `IDomainProcessCriteriaWithExistingRecs`, `IDomainProcessWithParamsCriteria`
+* Application Domain Factory (AT4DX): `Application` — specifically the inner class `Application.Domain`
 
-##### Core Domain Class from the AT4DX Framework
-* `ApplicationSObjectDomain`
-* `IApplicationSObjectDomain`
-* `DomainProcessConstants`
+#### Bundled custom metadata type references
+* `references/at4dx/ApplicationFactory_DomainBinding__mdt.md` — maps domain classes to their respective SObject via Force-DI and configures how the Application.Domain factory manages the domain implementations.
+* `references/at4dx/DomainProcessBinding__mdt.md` — maps domain criteria and action classes to their specific domain processes via Force-DI.
+* `references/at4dx/ApplicationFactory_UnitOfWorkBinding__mdt.md` — defines the org-wide Unit of Work DML execution sequence.
 
-##### Apex Classes Related to Domain Process Actions from the AT4DX Framework
-* `DomainProcessAbstractAction`
-* `IDomainProcessAction`
-* `IDomainProcessActionWithExistingRecs`
-* `IDomainProcessQueueableAction`
-* `IDomainProcessWithParamsAction`
-
-##### Apex Classes Related to Domain Process Criteria from the AT4DX Framework
-* `IDomainProcessCriteria`
-* `IDomainProcessCriteriaWithExistingRecs`
-* `IDomainProcessWithParamsCriteria`
-
-##### Apex Classes Related to the AT4DX Application Domain Factory
-* `Application`
-    * Specifically the inner class `Application.Domain`
-
-#### Custom Metadata Types
-If you have not done so previously, use the `learn-org-metadata` skill and understand the complete schema for the following Custom Metadata Types and review them thoroughly.  These custom metadata types are specifically related to AT4DX framework's management of Domain classes:
-
-##### ApplicationFactory_DomainBinding__mdt
-This custom metadata type is used via the Force-DI dependency injection framework to map domain classes to their respective SObject and configure how the Application.Domain factory class will manage the domain implementations.
-
-##### DomainProcessBinding__mdt
-This custom metadata type is used via the Force-DI dependency injection framework to map domain criteria and action classes their specific domain processes.
+Use the `learn-org-symbol-table` / `learn-org-metadata` skills only for what is NOT bundled — dependency-package classes (e.g., `UCMN_*`), project classes, and project SObject schemas — or to verify a bundled reference against the org when you suspect drift. If the org disagrees with a bundled reference, trust the org and report the discrepancy.
 
 ### CRITICAL: Trigger Syntax
 The `fflib_SObjectDomain.triggerHandler` method is the only acceptable way to invoke domain logic from a trigger. Its syntax is precise and must be followed exactly.

@@ -32,37 +32,20 @@ This skill manages the "Selector" layer for an SObject, including both the core 
         *   If the class is found, announce: "**Verified that the external selector [Verified Class Name] exists. I will use the Selector Method Injection pattern to extend it.**" You may then proceed to the **Selector Method Injection** section.
         *   If the class is not found after a thorough search, you must stop and report this as an architectural inconsistency. Do not proceed with creating a local selector for an external SObject.
 
-### Ensure Exact Understanding Of Classes, Interfaces, and Custom Metadata Types From AT4DX Framework Related to Apex Selectors
+### Framework API References (Bundled)
 
-#### Apex Classes
-If you have not done so previously, use the `learn-org-symbol-table` skill and find the SymbolTables for the following Apex classes and review them thoroughly.  These classes are specifically related to AT4DX framework's management of Selector classes.  Note: The AT4DX Framework classes do not have a prefix.  Do not try to add on infer a prefix for these AT4DX classes mentioned here.
+This skill bundles generated, provenance-stamped API references for the framework classes and custom metadata types it relies on, under `references/fflib-apex-common/` and `references/at4dx/` — one markdown file per class (see `xdocs/adr/0008`). **Before implementing against any framework class, read its bundled reference file — do not work from memory.** Note: the framework classes have no prefix; do not infer one.
 
-##### Core Selector Classes from the FFLIB Apex Common Framework
-* `fflib_ISObjectSelector`
-* `fflib_SObjectSelector`
-* `fflib_QueryFactory`
+#### Bundled Apex class references
+* Core Selector classes (fflib-apex-common): `fflib_ISObjectSelector`, `fflib_SObjectSelector`, `fflib_QueryFactory` — `references/fflib-apex-common/<ClassName>.md`
+* Core Selector classes (AT4DX): `ApplicationSObjectSelector`, `IApplicationSObjectSelector` — `references/at4dx/<ClassName>.md`
+* Selector Method Injection (AT4DX): `AbstractSelectorMethodInjectable`, `AbstractSelectorQueryLocatorInjectable`, `ISelectorMethodInjectable`, `ISelectorMethodParameterable`, `ISelectorMethodSetable`, `ISelectorQueryLocatorMethodInjectable`
+* Application Selector Factory (AT4DX): `Application` — specifically the inner class `Application.Selector`
 
-##### Core Selector Classes from the AT4DX Framework
-* `ApplicationSObjectSelector`
-* `IApplicationSObjectSelector`
+#### Bundled custom metadata type references
+* `references/at4dx/ApplicationFactory_SelectorBinding__mdt.md` — maps selector classes to their respective SObject via Force-DI and configures how the Application.Selector factory manages the selector implementations.
 
-##### Apex Classes Related to Selector Method Injection from the AT4DX Framework
-* `AbstractSelectorMethodInjectable`
-* `AbstractSelectorQueryLocatorInjectable`
-* `ISelectorMethodInjectable`
-* `ISelectorMethodParameterable`
-* `ISelectorMethodSetable`
-* `ISelectorQueryLocatorMethodInjectable`
-
-##### Apex Classes Related to the AT4DX Application Selector Factory
-* `Application`
-    * Specifically the inner class `Application.Selector`
-
-#### Custom Metadata Types
-If you have not done so previously, use the `learn-org-metadata` skill and understand the complete schema for the following Custom Metadata Types and review them thoroughly.  These custom metadata types are specifically related to AT4DX framework's management of Selector classes:
-
-##### ApplicationFactory_SelectorBinding__mdt
-This custom metadata type is used via the Force-DI dependency injection framework to map selector classes to their respective SObject and configure how the Application.Selector factory class will manage the selector implementations.
+Use the `learn-org-symbol-table` / `learn-org-metadata` skills only for what is NOT bundled — dependency-package classes (e.g., `UCMN_*`), project classes, and project SObject schemas — or to verify a bundled reference against the org when you suspect drift. If the org disagrees with a bundled reference, trust the org and report the discrepancy.
 
 ## Core Selector Management
 *Use this path ONLY if the deduction workflow in Step 1 determines the selector is managed locally by this project.*
