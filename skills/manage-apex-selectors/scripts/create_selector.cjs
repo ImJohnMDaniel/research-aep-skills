@@ -2,7 +2,6 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const os = require("os");
 
 const sObjectName = process.argv[2];
 
@@ -215,11 +214,8 @@ async function run() {
             const learnScriptPath = path.join(__dirname, '../../learn-org-metadata/scripts/learn_metadata.cjs');
             execSync(`node ${learnScriptPath} ${sObjectName}`);
             
-            const projectPath = process.cwd();
-            const projectName = path.basename(projectPath);
-            const geminiTmpDir = path.join(os.homedir(), '.gemini', 'tmp', projectName);
-            const orgMetadataPath = path.join(geminiTmpDir, 'org-metadata', orgInfo.id, 'sobjects', `${sObjectName}.json`);
-            
+            const orgMetadataPath = path.join(process.cwd(), '.aep', 'cache', 'org-metadata', orgInfo.id, 'sobjects', `${sObjectName}.json`);
+
             const orgMetadata = JSON.parse(fs.readFileSync(orgMetadataPath, 'utf8'));
 
             const orgFieldNames = orgMetadata.fields.filter(isContractEligibleOrgField).map(f => f.name);

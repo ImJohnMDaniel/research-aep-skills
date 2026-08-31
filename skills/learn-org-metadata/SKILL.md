@@ -10,8 +10,8 @@ This skill automates the retrieval of SObject describe information (fields, type
 ## Workflow
 
 1.  **Identify Targets:** Determine which SObjects, Custom Metadata Types (`__mdt`), or Custom Settings you need to understand.
-2.  **Fetch Metadata:** Runs `sf sobject describe` to get the full JSON definition.
-3.  **Local Storage:** Categorizes and stores the JSON in `.gemini/org-metadata/<OrgID>/`.
+2.  **Run the script:** It prints a compact field summary of each object to stdout — described via `sf sobject describe` on first request, served from the local cache on subsequent runs (`--refresh` forces a re-describe). **Running the script IS the read**; consume its output directly.
+3.  **Do not read the cache files directly.** They live in `.aep/cache/org-metadata/<OrgID>/`, which self-excludes from git (`.aep/.gitignore`); some platforms restrict agent file tools from reading git-ignored paths, so the script's stdout is the supported access path on all platforms.
 
 ## Usage
 
@@ -30,8 +30,8 @@ node ./scripts/learn_metadata.cjs --all
 
 ## Storage Structure
 
-Data is organized by Org ID and category:
+Data is cached (script-private — see Workflow above) organized by Org ID and category:
 
--   `.gemini/org-metadata/<OrgID>/sobjects/`: Standard and Custom Objects.
--   `.gemini/org-metadata/<OrgID>/custom-metadata/`: Custom Metadata Types (`__mdt`).
--   `.gemini/org-metadata/<OrgID>/custom-settings/`: Custom Settings.
+-   `.aep/cache/org-metadata/<OrgID>/sobjects/`: Standard and Custom Objects.
+-   `.aep/cache/org-metadata/<OrgID>/custom-metadata/`: Custom Metadata Types (`__mdt`).
+-   `.aep/cache/org-metadata/<OrgID>/custom-settings/`: Custom Settings.

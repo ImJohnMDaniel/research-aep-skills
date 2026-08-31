@@ -3,6 +3,54 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Project-local, self-gitignoring cache (see issue #7 / ADR-0002). The cache
+// is this script's private storage: agents consume the summaries this script
+// PRINTS, never the cache files directly — some platforms' agent file tools
+// refuse to read git-ignored paths, but a script's own fs access (and its
+// stdout) is unrestricted everywhere.
+function ensureAepCacheDir(subpath) {
+    const aepDir = path.join(process.cwd(), '.aep');
+    const dir = path.join(aepDir, 'cache', subpath);
+    fs.mkdirSync(dir, { recursive: true });
+    const selfIgnore = path.join(aepDir, '.gitignore');
+    if (!fs.existsSync(selfIgnore)) fs.writeFileSync(selfIgnore, '*\n');
+    return dir;
+}
+
+function isVisible(modifiers) {
+    const mods = modifiers || [];
+    return !mods.includes('private') && !mods.includes('testMethod');
+}
+
+function signature(m, withReturn) {
+    const mods = (m.modifiers || []).join(' ');
+    const params = (m.parameters || []).map(p => `${p.type} ${p.name}`).join(', ');
+    const ret = withReturn && m.returnType ? `${m.returnType} ` : '';
+    return `${mods ? mods + ' ' : ''}${ret}${m.name}(${params})`;
+}
+
+// Compact API summary printed to stdout — this is the supported read path.
+function renderSymbolSummary(name, table) {
+    const lines = [`## ${name}`];
+    const decl = (table.tableDeclaration && table.tableDeclaration.modifiers) || [];
+    const lineage = [];
+    if (table.parentClass) lineage.push(`extends ${table.parentClass}`);
+    if (table.interfaces && table.interfaces.length) lineage.push(`implements ${table.interfaces.join(', ')}`);
+    if (decl.length || lineage.length) lines.push(`${decl.join(' ')}${decl.length && lineage.length ? ' — ' : ''}${lineage.join(', ')}`);
+    (table.constructors || []).filter(c => isVisible(c.modifiers))
+        .forEach(c => lines.push(`- ctor: ${signature(c, false)}`));
+    const seenProps = new Set();
+    [...(table.properties || []), ...(table.variables || [])]
+        .filter(p => isVisible(p.modifiers))
+        .filter(p => seenProps.has(p.name) ? false : seenProps.add(p.name))
+        .forEach(p => lines.push(`- prop: ${p.type} ${p.name}`));
+    (table.methods || []).filter(m => isVisible(m.modifiers))
+        .forEach(m => lines.push(`- ${signature(m, true)}`));
+    (table.innerClasses || []).filter(ic => isVisible((ic.tableDeclaration || {}).modifiers))
+        .forEach(ic => lines.push(`- inner type: ${name}.${ic.name}`));
+    return lines.join('\n');
+}
+
 /**
  * Usage:
  * node learn_symbols.cjs [ClassName1] [ClassName2] ...
@@ -80,21 +128,17 @@ async function run() {
 
         if (classesToQuery.length === 0) return;
 
-        // 4. Create storage directory
-        const projectName = path.basename(process.cwd());
-        const tempBaseDir = path.join(require('os').homedir(), '.gemini', 'tmp', projectName);
-        const storageDir = path.join(tempBaseDir, 'org-symbols', orgId);
-
-        if (!fs.existsSync(storageDir)) {
-            fs.mkdirSync(storageDir, { recursive: true });
-        }
+        // 4. Create storage directory (project-local, self-gitignoring)
+        const storageDir = ensureAepCacheDir(path.join('org-symbols', orgId));
 
         // 5. Query SymbolTable for each class
         for (const apexClass of classesToQuery) {
             try {
                 const outputPath = path.join(storageDir, `${apexClass.Name}.json`);
                 if (!refresh && fs.existsSync(outputPath)) {
-                    console.log(`Cached: ${apexClass.Name} (already stored; use --refresh to re-fetch).`);
+                    const cached = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
+                    console.log(`\n${renderSymbolSummary(apexClass.Name, cached)}`);
+                    console.log(`(from cache; use --refresh to re-fetch)`);
                     continue;
                 }
                 process.stdout.write(`Fetching SymbolTable for ${apexClass.Name}... `);
@@ -104,6 +148,7 @@ async function run() {
                 if (symbolTable) {
                     fs.writeFileSync(outputPath, JSON.stringify(symbolTable, null, 2));
                     console.log('Done.');
+                    console.log(`\n${renderSymbolSummary(apexClass.Name, symbolTable)}`);
                 } else {
                     console.log('No SymbolTable available.');
                 }

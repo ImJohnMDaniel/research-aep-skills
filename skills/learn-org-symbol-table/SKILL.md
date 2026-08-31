@@ -10,8 +10,8 @@ This skill automates the discovery of Apex class structures (methods, variables,
 ## Workflow
 
 1.  **Selection:** Identify which classes or patterns (e.g., `UCMN_*`) you need to learn.
-2.  **Fetch Symbols:** Retrieves the `SymbolTable` from the org for the selected classes.
-3.  **Local Storage:** Stores the symbol tables as JSON files in `.gemini/org-symbols/<OrgID>/`.
+2.  **Run the script:** It prints a compact API summary of each class to stdout — fetched from the org on first request, served from the local cache on subsequent runs (`--refresh` forces a re-fetch). **Running the script IS the read**; consume its output directly.
+3.  **Do not read the cache files directly.** They live in `.aep/cache/org-symbols/<OrgID>/`, which self-excludes from git (`.aep/.gitignore`); some platforms restrict agent file tools from reading git-ignored paths, so the script's stdout is the supported access path on all platforms.
 
 ## Best Practices for Efficiency
 
@@ -48,6 +48,6 @@ node ./scripts/learn_symbols.cjs --all
 
 ## Storage Structure
 
-Symbol data is organized by Org ID to avoid collisions:
+Symbol data is cached (script-private — see Workflow above) organized by Org ID to avoid collisions:
 
-`.gemini/org-symbols/<OrgID>/<ClassName>.json`
+`.aep/cache/org-symbols/<OrgID>/<ClassName>.json`

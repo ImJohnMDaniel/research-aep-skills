@@ -65,9 +65,8 @@ If the project has a dependency on `universal-common` (prefix `UCMN`), most stan
 
 ### Discovery Workflow
 1.  **Deduce Name**: Based on the `UCMN` prefix and standard pluralization (e.g., `UCMN_UsersSelector`).
-2.  **Check Local Symbols**: Look in `.gemini/org-symbols/<OrgID>/` for the deduced class.
-3.  **Fetch if Missing**: If the deduced class is not found locally, use the `learn-org-symbol-table` skill to fetch it.
-4.  **Evaluate**: Inspect the `SymbolTable` JSON to see existing methods/fields.
+2.  **Run the learn script**: `learn_symbols.cjs <DeducedName>` (from the `learn-org-symbol-table` skill) prints the class's API summary — served from its local cache when available, fetched from the org otherwise.
+3.  **Evaluate**: Inspect the printed summary to see existing methods/fields.
     - **Trigger Existence**: If a Domain class exists for an SObject, assume a corresponding trigger also exists for that SObject in that package.
     - **Logic Extension**: If the required logic is missing, implement **Domain Process Injection** rather than creating a new Domain class.
     - **Redundancy**: If a redundant trigger exists in the current project (one that calls a Domain already handled by a dependency package's trigger), the agent MUST recommend **removing** the redundant trigger instead of updating it.

@@ -3,6 +3,30 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Project-local, self-gitignoring cache (see issue #7 / ADR-0002). The cache
+// is this script's private storage: agents consume the summaries this script
+// PRINTS, never the cache files directly — some platforms' agent file tools
+// refuse to read git-ignored paths, but a script's own fs access (and its
+// stdout) is unrestricted everywhere.
+function ensureAepCacheDir(subpath) {
+    const aepDir = path.join(process.cwd(), '.aep');
+    const dir = path.join(aepDir, 'cache', subpath);
+    fs.mkdirSync(dir, { recursive: true });
+    const selfIgnore = path.join(aepDir, '.gitignore');
+    if (!fs.existsSync(selfIgnore)) fs.writeFileSync(selfIgnore, '*\n');
+    return dir;
+}
+
+// Compact schema summary printed to stdout — this is the supported read path.
+function renderDescribeSummary(describe) {
+    const lines = [`## ${describe.name} (${describe.label})`];
+    for (const f of describe.fields || []) {
+        const refs = (f.referenceTo && f.referenceTo.length) ? ` -> ${f.referenceTo.join(', ')}` : '';
+        lines.push(`- ${f.name}: ${f.type}${f.length ? `(${f.length})` : ''}${refs}`);
+    }
+    return lines.join('\n');
+}
+
 /**
  * Usage:
  * node learn_metadata.cjs <SObjectName1> [SObjectName2] ...
@@ -14,6 +38,7 @@ async function run() {
     try {
         const args = process.argv.slice(2);
         let fetchAll = args.includes('--all');
+        let refresh = args.includes('--refresh');
         let patterns = args.filter(a => !a.startsWith('--'));
         let globPattern = args.find(a => args[args.indexOf(a) - 1] === '--pattern');
 
@@ -22,6 +47,7 @@ async function run() {
             console.log('  node learn_metadata.cjs <SObjectName1> [SObjectName2] ...');
             console.log('  node learn_metadata.cjs --pattern <RegexPattern>');
             console.log('  node learn_metadata.cjs --all');
+            console.log('  Add --refresh to re-describe objects that are already cached.');
             return;
         }
 
@@ -47,10 +73,8 @@ async function run() {
 
         console.log(`Found ${sobjectsToDescribe.length} matching SObjects to describe.`);
 
-        // 3. Create storage directories
-        const projectName = path.basename(process.cwd());
-        const tempBaseDir = path.join(require('os').homedir(), '.gemini', 'tmp', projectName);
-        const baseDir = path.join(tempBaseDir, 'org-metadata', orgId);
+        // 3. Create storage directories (project-local, self-gitignoring)
+        const baseDir = ensureAepCacheDir(path.join('org-metadata', orgId));
 
         const subDirs = {
             sobject: path.join(baseDir, 'sobjects'),
@@ -62,9 +86,20 @@ async function run() {
             if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         });
 
+        const findCached = (name) => Object.values(subDirs)
+            .map(dir => path.join(dir, `${name}.json`))
+            .find(p => fs.existsSync(p));
+
         // 4. Describe each SObject
         for (const sobjectName of sobjectsToDescribe) {
             try {
+                const cachedPath = refresh ? null : findCached(sobjectName);
+                if (cachedPath) {
+                    const cached = JSON.parse(fs.readFileSync(cachedPath, 'utf8'));
+                    console.log(`\n${renderDescribeSummary(cached)}`);
+                    console.log(`(from cache; use --refresh to re-describe)`);
+                    continue;
+                }
                 process.stdout.write(`Describing ${sobjectName}... `);
                 const describeResult = JSON.parse(execSync(`sf sobject describe --sobject ${sobjectName} --json`, { encoding: 'utf8' }));
                 const describeData = describeResult.result;
@@ -78,6 +113,7 @@ async function run() {
 
                 fs.writeFileSync(path.join(targetDir, `${sobjectName}.json`), JSON.stringify(describeData, null, 2));
                 console.log('Done.');
+                console.log(`\n${renderDescribeSummary(describeData)}`);
             } catch (e) {
                 console.log(`Failed: ${e.message}`);
             }
