@@ -176,10 +176,13 @@ When extending a generated selector with new query methods, you **MUST** use the
 
 ### Method Signature & Return Type Restrictions
 
-Every custom query method MUST adhere to strict return type guidelines:
+Every custom query method MUST adhere to strict return type guidelines (see `xdocs/adr/0007`, ruling 5 — the selector's single responsibility is returning record lists; any second purpose violates single responsibility):
 1. **Allowed Return Types**: Only `List<SObject>` (or specific lists like `List<MyObject__c>`) and `Database.QueryLocator` are permitted.
 2. **No Single SObject Records**: You MUST NOT return a single record (e.g. `MyObject__c`). This is a critical violation of bulkification mandates. Always design methods to handle sets of keys or values and return a list of records.
 3. **No Data Transformations**: Selector methods MUST NOT transform SObject data into Map, Set, or other collection types (e.g., converting SObjects into `Map<String, Id>` or `Set<String>`). Returning primitive collections is a major separation-of-concerns anti-pattern. Let the calling Service, Domain, or Action handle all collections and mapping logic.
+4. **No `Map<Id, SObject>` Returns**: Re-keying records by Id is not a data transformation, but it is a purpose other than returning the record list. The caller builds the map itself: `new Map<Id, MyObject__c>(selector.selectByIds(ids))`.
+5. **Aggregate Queries**: Aggregate queries belong in selectors and return `List<AggregateResult>`. Extracting values from the results is the caller's logic.
+6. **No Wrapper/DTO Returns** *(current canon, provisional)*: Returning custom wrapper classes assembled from queried data is not allowed. There is ongoing community debate on this topic; guidance may be adjusted in the future.
 
 **Correct Usage:**
 ```apex
@@ -211,9 +214,11 @@ fflib_QueryFactory qf = new fflib_QueryFactory(MyObject__c.SObjectType);
 - **Factory Registration**: Selectors MUST be registered via `ApplicationFactory_SelectorBinding` custom metadata to enable Force-DI resolution.
 - **Access**: Use the `newInstance()` static method to access selectors via the `Application.Selector` factory.
 - **Calling Selectors**: Always call the selector's static `newInstance()` method directly within your business logic. Do not store selectors as instance variables or inject them via the constructor. This pattern is an anti-pattern in AT4DX as mocking is handled by the Application Factory. See the main `salesforce-platform-enterprise-architecture` skill for detailed examples.
-- **Strict Return Types (No Transformations / Single Records)**: All custom query methods in a Selector class MUST only return either a `List<SObject>` or a `Database.QueryLocator`. They **MUST NOT**:
+- **Strict Return Types (No Transformations / Single Records)**: All custom query methods in a Selector class MUST only return either a `List<SObject>` (including `List<AggregateResult>` for aggregate queries) or a `Database.QueryLocator`. They **MUST NOT**:
   - Return a single `SObject` record (e.g., `User` instead of `List<User>`), as this violates the platform's **bulkification mandate** and is a critical anti-pattern.
   - Return any non-SObject collection types or maps of primitives (e.g., `Set<String>`, `Map<String, Id>`), as **Selectors must never perform data transformations**; this logic belongs in the calling Service, Domain, or Action layer.
+  - Return maps of any kind, including `Map<Id, SObject>` — re-keying is a second purpose beyond returning the record list; callers build maps themselves.
+  - Return custom wrapper/DTO types *(current canon, provisional — see `xdocs/adr/0007`)*.
 - **One Selector, One SObject**: A Selector class is strictly responsible for querying a single SObject. It is a critical anti-pattern for a selector to query another SObject's data, even if it is a related child or parent. Instead, you must invoke the appropriate selector for that object. For example, `AccountSelector` must not query for `Contact` records; it must call `ContactsSelector.newInstance()`. This is enforced by ensuring any call to `newQueryFactory(SomeObject__c.SObjectType)` uses an SObject type that matches the selector's own `getSObjectType()`.
 
 - **Naming Conventions**:
