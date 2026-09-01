@@ -90,15 +90,18 @@ function run() {
         const rows = sf(`data query --query "SELECT Name FROM ApexClass WHERE NamespacePrefix = '${marker}'" --use-tooling-api`).records;
         classNames = rows.map(r => r.Name).sort();
     } else {
+        // SOQL LIKE is case-insensitive; keep the JS post-filter case-insensitive
+        // too (Apex class names are case-insensitive identifiers org-side).
+        const prefixLower = `${marker.toLowerCase()}_`;
         const rows = sf(`data query --query "SELECT Name FROM ApexClass WHERE NamespacePrefix = null AND Name LIKE '${marker}%'" --use-tooling-api`).records;
-        classNames = rows.map(r => r.Name).filter(n => n.startsWith(`${marker}_`)).sort();
+        classNames = rows.map(r => r.Name).filter(n => n.toLowerCase().startsWith(prefixLower)).sort();
     }
 
     // --- SObject names -----------------------------------------------------------
     console.log('Querying SObjects...');
     const allSObjects = sf('sobject list --sobject all');
-    const objectPrefix = isNamespace ? `${marker}__` : `${marker}_`;
-    const packageObjects = allSObjects.filter(n => n.startsWith(objectPrefix)).sort();
+    const objectPrefix = (isNamespace ? `${marker}__` : `${marker}_`).toLowerCase();
+    const packageObjects = allSObjects.filter(n => n.toLowerCase().startsWith(objectPrefix)).sort();
 
     // Reverse-plural map over ALL org SObjects, for Domain/Selector annotation:
     // e.g. plural "Users" -> "User"; both full-base and prefix-stripped keys.
