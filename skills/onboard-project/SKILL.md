@@ -25,6 +25,7 @@ Note: onboarding an org's unpackaged "Happy Soup" repository (the one project th
    - **Purpose** — one line, in their words: why is this dependency present?
    - **Layer** — place it in the ecosystem taxonomy (offer an inferred guess where the name or purpose makes it obvious): **Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Third-Party Managed / Integration**. (A Single-Org ecosystem simply has no Universal Common tier.)
    - **Prefix** — the package's class prefix; for Third-Party Managed packages, the namespace instead. For Third-Party Extension packages, also record **which managed namespace's AEP layers the extension owns** (e.g., "AEP layers for DocuSign (`dsfs__`) objects") — this mapping is not derivable from names and is required for ownership resolution of namespaced objects.
+   - **Bundled-coverage mapping** — confirm with the developer which entries correspond to the four packages this plugin bundles tier-1 references for: **fflib-apex-common, fflib-apex-mocks, force-di, at4dx**. Dependency names may differ (shops often consume these as renamed private clones — e.g., `acme-fflib-common`), so the mapping is asked, never assumed from names. A developer whose clone has **meaningfully diverged** from upstream may decline the mapping — their fork is then treated as uncovered and gets an inventory instead of subtly-wrong bundled references.
    - **Version snapshot** — copy the version string from `sfdx-project.json` **verbatim** (e.g., `1.4.0.LATEST`); do not resolve or normalize it.
 4. **Standard-SObjects manager.** Usually identified during the review ("which of these manages the standard objects?"); ask explicitly if not. Value may be a package prefix, `this project`, or a split mapping (e.g., `User, Task: CMN; Product2: PRICING`).
 5. **Write the section** (format below) into the current platform's project context file — the file this session auto-loaded (e.g., `CLAUDE.md` for Claude Code, `GEMINI.md` for Gemini CLI) — creating it if absent, always with the developer's confirmation of the final text first. Teams use one platform per project; write only the current platform's file.
@@ -39,7 +40,9 @@ Note: onboarding an org's unpackaged "Happy Soup" repository (the one project th
 - Standard SObjects are managed by: CMN (common-core package)
 - Dependencies:
   - Framework:
-    - fflib-apex-common, fflib-apex-mocks, force-di, at4dx (no prefix): AEP framework base
+    - acme-fflib-common (no prefix) @ 5.1.0: private clone of fflib-apex-common — covered by bundled tier-1 references
+    - at4dx (no prefix) @ 1.2.0: AEP framework — covered by bundled tier-1 references
+    - acme-promises (PRM) @ 2.0.0: async promise library — inventoried
   - Universal Common:
     - universal-common (CMN) @ 1.4.0.LATEST: standard-SObject layers shared across all orgs
   - Project Common:
@@ -54,7 +57,7 @@ Record **only what is not derivable**: purposes, layer placement, ownership fact
 
 ## Package Inventories
 
-For each **non-framework** dependency with a prefix or namespace (the framework packages are covered by the plugin's bundled tier-1 references and get no inventories), generate a committed name inventory:
+Generate a committed name inventory for **every dependency EXCEPT those the developer mapped to the plugin's bundled tier-1 references** during the review. Coverage is decided by that confirmed mapping — never by layer placement (a Framework-layer library that is not one of the four bundled AEP frameworks absolutely gets an inventory) and never by name matching alone. One limitation: inventory generation needs a membership marker (prefix or namespace); for an unmarked package, record its purpose line and note that no inventory is possible — strict prefix naming is the only membership signal available.
 
 ```bash
 node ./scripts/generate_package_inventory.cjs <package-name> <PREFIX> --declared "<version string verbatim>"
