@@ -17,11 +17,18 @@ This skill establishes the project knowledge every other AEP skill depends on: t
 
 Note: onboarding an org's unpackaged "Happy Soup" repository (the one project that depends on all packages) is not yet supported — if this repo appears to be one, inform the developer and stop.
 
+## Non-Negotiable Rules
+
+1. **Every step of the Interview below is REQUIRED — none may be skipped**, the dependency review included. Where other skills describe the Dependencies subsection as something a project may not have yet, that describes its *presence before onboarding* — producing it is mandatory here.
+2. **Purposes and layer assignments are developer-provided facts.** You cannot know why a dependency is present — only the developer can. A value you inferred is a **proposal**: label it `(proposed — confirm)`, never present it as fact.
+3. **If you have not asked, you do not have an answer.** Never fill in a purpose, layer, manager, or prefix the developer has not confirmed — the sole exception is the framework prefixes auto-recorded from the confirmed tier-1 mapping.
+4. **The write is gated on sign-off.** The context file is written only after the developer approves the complete rendered `## AEP Conventions` section, with every dependency row present and no unconfirmed values remaining.
+
 ## The Interview
 
 1. **Check existing state.** If a complete `## AEP Conventions` section exists, offer a review/refresh instead of a fresh interview. Compare each Dependencies version snapshot against `sfdx-project.json`; report any drift.
 2. **Project prefix.** Infer a candidate by scanning the default package directory (from `sfdx-project.json`) for prefixed classes/objects, offer it for confirmation, and ask if nothing can be inferred.
-3. **Dependency review.** Read the `dependencies` (and `packageAliases`) from `sfdx-project.json`. For each dependency, ask the developer:
+3. **Dependency review.** Read the `dependencies` (and `packageAliases`) from `sfdx-project.json`. Present **ALL** of them to the developer as a review table — name | layer | purpose | prefix | version — with every cell you inferred labeled `(proposed — confirm)` and every cell you cannot infer left visibly blank. Ask the developer to confirm or correct **each row**; do not proceed to step 4 while any row remains unconfirmed. The fields, per dependency:
    - **Purpose** — one line, in their words: why is this dependency present?
    - **Layer** — place it in the ecosystem taxonomy (offer an inferred guess where the name or purpose makes it obvious): **Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Third-Party Managed / Integration**. (A Single-Org ecosystem simply has no Universal Common tier.)
    - **Prefix** — the package's class prefix; for Third-Party Managed packages, the namespace instead. For Third-Party Extension packages, also record **which managed namespace's AEP layers the extension owns** (e.g., "AEP layers for DocuSign (`dsfs__`) objects") — this mapping is not derivable from names and is required for ownership resolution of namespaced objects.
@@ -29,7 +36,7 @@ Note: onboarding an org's unpackaged "Happy Soup" repository (the one project th
    - **Framework prefixes are auto-recorded, never asked.** Once an entry is mapped to one of the four frameworks, record its known prefix without asking the developer: `fflib-apex-common` → **fflib**; `fflib-apex-mocks` → **fflib**; `force-di` → **di**; `at4dx` → **no prefix**.
    - **Version snapshot** — copy the version string from `sfdx-project.json` **verbatim** (e.g., `1.4.0.LATEST`); do not resolve or normalize it.
 4. **Standard-SObjects manager.** Usually identified during the review ("which of these manages the standard objects?"); ask explicitly if not. Value may be a package prefix, `this project`, or a split mapping (e.g., `User, Task: CMN; Product2: PRICING`).
-5. **Write the section** (format below) into the current platform's project context file — the file this session auto-loaded (e.g., `CLAUDE.md` for Claude Code, `GEMINI.md` for Gemini CLI) — creating it if absent, always with the developer's confirmation of the final text first. Teams use one platform per project; write only the current platform's file.
+5. **Write the section** (format below) into the current platform's project context file — the file this session auto-loaded (e.g., `CLAUDE.md` for Claude Code, `GEMINI.md` for Gemini CLI) — creating it if absent, and only after the developer approves the complete rendered section (Non-Negotiable Rule 4). Teams use one platform per project; write only the current platform's file.
 6. **Generate package inventories** (see below), then suggest committing the context file and `aep-references/` together.
 
 ## The AEP Conventions format
