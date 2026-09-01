@@ -32,6 +32,7 @@ The project declares the two facts that cannot be derived from code or org in a 
 
 - **Project prefix** — the prefix this project owns. Pass it to generator scripts via `--prefix`.
 - **Standard SObjects are managed by** — the prefix (optionally with package name) of the package responsible for standard SObjects. The value may be `this project` for a standalone project that owns them itself, or a mapping when ownership is split (e.g., `User, Task: CMN; Product2: PRICING`).
+- **Dependencies** (optional; written and maintained by the `onboard-project` skill) — the project's dependencies grouped by ecosystem layer (Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Third-Party Managed / Integration), each line carrying the package's prefix, the declared version snapshot, and its purpose — e.g., `- docusign-ext (DSX) @ 1.2.0: AEP layers (selectors/domains) for DocuSign (dsfs__) objects`. Third-Party Extension lines declare which managed-package namespace's AEP layers that extension owns.
 
 **If the section is missing from the project context file, do not guess.** Ask the developer these two questions, then — with their confirmation — write the `## AEP Conventions` section into the project context file before proceeding.
 
@@ -40,8 +41,9 @@ The project declares the two facts that cannot be derived from code or org in a 
 ## Resolving an SObject's owner
 
 1. **Prefixed SObject:** the prefix names the owner — custom objects are self-describing. Prefix matches the project prefix → this project owns it. Any other prefix → that package owns it.
-2. **Standard SObject:** consult the `Standard SObjects are managed by` hint, then verify the owner's layer actually exists via the `learn-org-symbol-table` skill (deduce `<Prefix>_<PluralName>` / `<Prefix>_<PluralName>Selector`).
-3. **Mismatch or silence:** the hint names an owner but discovery finds nothing → report an architectural inconsistency. No hint claims the SObject and discovery finds no owner → ownership is **unclaimed**: stop and ask the developer whether this project should own it (a local trigger/Domain/Selector is then legitimate) or another package will.
+2. **Namespaced SObject** (a managed package's object, e.g. `dsfs__Envelope__c`): the managed package itself carries no AEP layers. The layers belong to the **designated Third-Party Extension package** for that namespace, per the Dependencies annotations in the AEP Conventions section. Uniquely, the object's own name does NOT identify its AEP-layer owner here — the namespace→extension mapping must be declared. No extension package declared for the namespace → treat as unclaimed (step 4).
+3. **Standard SObject:** consult the `Standard SObjects are managed by` hint, then verify the owner's layer actually exists via the `learn-org-symbol-table` skill (deduce `<Prefix>_<PluralName>` / `<Prefix>_<PluralName>Selector`).
+4. **Mismatch or silence:** the hint names an owner but discovery finds nothing → report an architectural inconsistency. No hint claims the SObject and discovery finds no owner → ownership is **unclaimed**: stop and ask the developer whether this project should own it (a local trigger/Domain/Selector is then legitimate) or another package will.
 
 # II. The Holistic Refactoring Mandate
 
