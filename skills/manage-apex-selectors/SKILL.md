@@ -37,7 +37,7 @@ This skill manages the "Selector" layer for an SObject, including both the core 
 
 ### Framework API References (Bundled)
 
-This skill bundles generated, provenance-stamped API references for the framework classes and custom metadata types it relies on, under `references/fflib-apex-common/` and `references/at4dx/` — one markdown file per class (see `xdocs/adr/0008`). **Before implementing against any framework class, read its bundled reference file — do not work from memory.** Note: the framework classes have no prefix; do not infer one.
+This skill bundles generated, provenance-stamped API references for the framework classes and custom metadata types it relies on, under `references/fflib-apex-common/` and `references/at4dx/` — one markdown file per class (see `xdocs/adr/0008`). **Before implementing against any framework class, read its bundled reference file — do not work from memory.** Note: AT4DX classes carry no prefix; fflib classes use the lowercase `fflib_` prefix and force-di classes use `di_` — never infer a project-style prefix for any framework class.
 
 #### Bundled Apex class references
 * Core Selector classes (fflib-apex-common): `fflib_ISObjectSelector`, `fflib_SObjectSelector`, `fflib_QueryFactory` — `references/fflib-apex-common/<ClassName>.md`

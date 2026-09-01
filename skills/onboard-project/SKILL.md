@@ -26,6 +26,7 @@ Note: onboarding an org's unpackaged "Happy Soup" repository (the one project th
    - **Layer** — place it in the ecosystem taxonomy (offer an inferred guess where the name or purpose makes it obvious): **Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Third-Party Managed / Integration**. (A Single-Org ecosystem simply has no Universal Common tier.)
    - **Prefix** — the package's class prefix; for Third-Party Managed packages, the namespace instead. For Third-Party Extension packages, also record **which managed namespace's AEP layers the extension owns** (e.g., "AEP layers for DocuSign (`dsfs__`) objects") — this mapping is not derivable from names and is required for ownership resolution of namespaced objects.
    - **Bundled-coverage mapping** — confirm with the developer which entries correspond to the four packages this plugin bundles tier-1 references for: **fflib-apex-common, fflib-apex-mocks, force-di, at4dx**. Dependency names may differ (shops often consume these as renamed private clones — e.g., `acme-fflib-common`), so the mapping is asked, never assumed from names. A developer whose clone has **meaningfully diverged** from upstream may decline the mapping — their fork is then treated as uncovered and gets an inventory instead of subtly-wrong bundled references.
+   - **Framework prefixes are auto-recorded, never asked.** Once an entry is mapped to one of the four frameworks, record its known prefix without asking the developer: `fflib-apex-common` → **fflib**; `fflib-apex-mocks` → **fflib**; `force-di` → **di**; `at4dx` → **no prefix**.
    - **Version snapshot** — copy the version string from `sfdx-project.json` **verbatim** (e.g., `1.4.0.LATEST`); do not resolve or normalize it.
 4. **Standard-SObjects manager.** Usually identified during the review ("which of these manages the standard objects?"); ask explicitly if not. Value may be a package prefix, `this project`, or a split mapping (e.g., `User, Task: CMN; Product2: PRICING`).
 5. **Write the section** (format below) into the current platform's project context file — the file this session auto-loaded (e.g., `CLAUDE.md` for Claude Code, `GEMINI.md` for Gemini CLI) — creating it if absent, always with the developer's confirmation of the final text first. Teams use one platform per project; write only the current platform's file.
@@ -40,7 +41,8 @@ Note: onboarding an org's unpackaged "Happy Soup" repository (the one project th
 - Standard SObjects are managed by: CMN (common-core package)
 - Dependencies:
   - Framework:
-    - acme-fflib-common (no prefix) @ 5.1.0: private clone of fflib-apex-common — covered by bundled tier-1 references
+    - acme-fflib-common (fflib) @ 5.1.0: private clone of fflib-apex-common — covered by bundled tier-1 references
+    - force-di (di) @ 1.0.0: dependency injection framework — covered by bundled tier-1 references
     - at4dx (no prefix) @ 1.2.0: AEP framework — covered by bundled tier-1 references
     - acme-promises (PRM) @ 2.0.0: async promise library — inventoried
   - Universal Common:
