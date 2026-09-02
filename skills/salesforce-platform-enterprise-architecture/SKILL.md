@@ -266,17 +266,17 @@ To efficiently and safely discover dependency selectors (like `CMN_UsersSelector
 1.  **Direct Name Search (Hypothesize)**: First, deduce the most likely selector name based on conventions (e.g., `CMN_` + Plural SObject Name + `Selector`). Use `learn-org-symbol-table` with this exact name.
     ```bash
     # Correct first step
-    node ./scripts/learn_symbols.cjs CMN_UsersSelector
+    node <learn-org-symbol-table skill>/scripts/learn_symbols.cjs CMN_UsersSelector
     ```
 2.  **Targeted Pattern Search (Broaden)**: If the direct search fails, broaden the search *slightly* with a targeted pattern that includes the SObject name.
     ```bash
     # Correct second step if the first fails
-    node ./scripts/learn_symbols.cjs --pattern "CMN_*Users*"
+    node <learn-org-symbol-table skill>/scripts/learn_symbols.cjs --pattern "CMN_*Users*"
     ```
 3.  **Broad Pattern Search (Last Resort)**: Only if both targeted searches fail, resort to a broader pattern. This is highly inefficient and should be avoided.
     ```bash
     # Incorrect: Do not do this unless absolutely necessary
-    node ./scripts/learn_symbols.cjs --pattern "CMN_*"
+    node <learn-org-symbol-table skill>/scripts/learn_symbols.cjs --pattern "CMN_*"
     ```
 
 ### Extending Dependency Layers: The "Read-Only Class" Problem

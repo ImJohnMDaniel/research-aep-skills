@@ -8,6 +8,9 @@
  * 2. Platform neutrality: files under skills/ must contain no
  *    platform-specific residue — .gemini paths, .claude paths, platform env
  *    vars, or a context-file reference that names only one platform.
+ * 3. Doc integrity: every repo-relative path a SKILL.md references
+ *    (assets/, scripts/, references/, xdocs/adr/NNNN) must exist —
+ *    catches filename rot mechanically (ADR-0009).
  *
  * Exit code 0 = clean; 1 = violations (each printed with file:line).
  */
@@ -69,10 +72,32 @@ function walk(dir) {
 }
 walk(path.join(REPO_ROOT, 'skills'));
 
+// --- 3. Doc integrity: referenced paths must exist -----------------------------
+// Scans each skill's SKILL.md for skill-relative path references (assets/,
+// scripts/, references/ — negative lookbehind excludes e.g. "aep-references/",
+// which lives in consuming projects) and xdocs/adr/NNNN citations. Tokens
+// containing placeholders (<...>, {...}, *) never match the pattern.
+const skillsRoot = path.join(REPO_ROOT, 'skills');
+for (const skill of fs.readdirSync(skillsRoot, { withFileTypes: true }).filter(e => e.isDirectory())) {
+    const skillMd = path.join(skillsRoot, skill.name, 'SKILL.md');
+    if (!fs.existsSync(skillMd)) { violations.push(`doc integrity: skills/${skill.name}/ has no SKILL.md`); continue; }
+    const lines = fs.readFileSync(skillMd, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+        for (const m of line.matchAll(/(?<![\w/>-])(?:\.\/)?((?:assets|scripts|references)\/[\w./-]+\.[a-z]+)/g)) {
+            const target = path.join(skillsRoot, skill.name, m[1]);
+            if (!fs.existsSync(target)) violations.push(`doc integrity: skills/${skill.name}/SKILL.md:${i + 1} references missing file ${m[1]}`);
+        }
+        for (const m of line.matchAll(/xdocs\/adr\/(\d{4})/g)) {
+            const hits = fs.readdirSync(path.join(REPO_ROOT, 'xdocs', 'adr')).filter(f => f.startsWith(m[1]));
+            if (!hits.length) violations.push(`doc integrity: skills/${skill.name}/SKILL.md:${i + 1} cites nonexistent ADR ${m[1]}`);
+        }
+    });
+}
+
 // --- Report --------------------------------------------------------------------
 if (violations.length) {
     console.error(`✖ ${violations.length} violation(s):\n`);
     violations.forEach(v => console.error(`  - ${v}`));
     process.exit(1);
 }
-console.log('✔ Manifests in parity; skills/ is platform-neutral.');
+console.log('✔ Manifests in parity; skills/ platform-neutral; referenced paths exist.');

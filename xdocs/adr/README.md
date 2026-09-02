@@ -17,3 +17,4 @@ Decisions of record for the AEP skills project. Conventions:
 | [0006](0006-no-batch-orchestrator.md) | No batch orchestrator; the agent orchestrates | Accepted |
 | [0007](0007-guidance-taxonomy-and-canon-rulings.md) | Guidance taxonomy and canon rulings | Accepted |
 | [0008](0008-bundled-framework-references.md) | Bundled framework references, generated from a build-time scratch org | Accepted |
+| [0009](0009-testing-strategy.md) | Testing strategy: four layers, evals as the behavioral harness | Accepted |
