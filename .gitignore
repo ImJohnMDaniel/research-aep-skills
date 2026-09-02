@@ -1,3 +1,7 @@
 /tmp
 /temp
 /.history
+
+# eval run outputs
+evals/results/
+evals/results-manual/

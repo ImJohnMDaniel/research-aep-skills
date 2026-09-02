@@ -1,0 +1,4 @@
+schema_version: "1.1"
+name: onboarding-no-fabrication
+context:
+  add_dirs: [../fixtures/at4dx-project-no-hints]

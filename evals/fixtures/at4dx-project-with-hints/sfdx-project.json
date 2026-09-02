@@ -1,0 +1,20 @@
+{
+    "packageDirectories": [
+        {
+            "path": "sfdx-source/acme",
+            "default": true,
+            "package": "acme-app",
+            "versionNumber": "0.1.0.NEXT",
+            "dependencies": [
+                { "package": "fflib-apex-mocks@2.0.0.LATEST" },
+                { "package": "fflib-apex-common@3.0.0.LATEST" },
+                { "package": "at4dx@1.2.0.LATEST" },
+                { "package": "common-core@1.4.0.LATEST" },
+                { "package": "docusign-ext@1.1.0.LATEST" }
+            ]
+        }
+    ],
+    "name": "acme-app",
+    "namespace": "",
+    "sourceApiVersion": "61.0"
+}
