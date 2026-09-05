@@ -78,7 +78,8 @@ walk(path.join(REPO_ROOT, 'skills'));
 // which lives in consuming projects) and xdocs/adr/NNNN citations. Tokens
 // containing placeholders (<...>, {...}, *) never match the pattern.
 const skillsRoot = path.join(REPO_ROOT, 'skills');
-for (const skill of fs.readdirSync(skillsRoot, { withFileTypes: true }).filter(e => e.isDirectory())) {
+// Underscore-prefixed directories (e.g. _shared) are support code, not skills.
+for (const skill of fs.readdirSync(skillsRoot, { withFileTypes: true }).filter(e => e.isDirectory() && !e.name.startsWith('_'))) {
     const skillMd = path.join(skillsRoot, skill.name, 'SKILL.md');
     if (!fs.existsSync(skillMd)) { violations.push(`doc integrity: skills/${skill.name}/ has no SKILL.md`); continue; }
     const lines = fs.readFileSync(skillMd, 'utf8').split('\n');

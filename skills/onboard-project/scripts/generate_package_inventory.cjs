@@ -23,23 +23,12 @@
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
-
-const EXEC_OPTS = { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 };
+const { parseFlags, getPlural, sfJson } = require('../../_shared/aep_lib.cjs');
 
 // --- Args --------------------------------------------------------------------
 const packageName = process.argv[2];
 const marker = process.argv[3];
-const args = process.argv.slice(4);
-const flags = {};
-for (let i = 0; i < args.length; i++) {
-    if (args[i].startsWith('--')) {
-        const key = args[i].slice(2);
-        const next = args[i + 1];
-        if (next && !next.startsWith('--')) { flags[key] = next; i++; }
-        else { flags[key] = true; }
-    }
-}
+const flags = parseFlags(process.argv.slice(4));
 
 if (!packageName || !marker) {
     console.error('Usage: node generate_package_inventory.cjs <package-name> <PREFIX|namespace> [--namespace] [--declared "<version>"] [--out <dir>] [--target-org <alias>]');
@@ -51,25 +40,8 @@ const orgFlag = flags['target-org'] ? ` --target-org ${flags['target-org']}` : '
 const outDir = flags.out || path.join('aep-references', packageName);
 const declared = flags.declared || '(not provided)';
 
-function sf(command) {
-    const parsed = JSON.parse(execSync(`sf ${command} --json${orgFlag}`, EXEC_OPTS));
-    if (parsed.status !== 0) throw new Error(`sf ${command} returned status ${parsed.status}`);
-    return parsed.result;
-}
-
-// Pluralization mirrors the generator scripts (duplication tracked in issue #22).
-function getPlural(name) {
-    const suffixes = ["__c", "__pc", "__mdt", "__e", "__Share", "__History", "__ChangeEvent"];
-    let baseName = name;
-    let suffix = "";
-    for (const s of suffixes) {
-        if (name.endsWith(s)) { baseName = name.slice(0, -s.length); suffix = s; break; }
-    }
-    if (suffix === "__Share") return baseName + "Shares";
-    if (baseName.endsWith("y")) return baseName.slice(0, -1) + "ies";
-    if (/(s|sh|ch|x|z)$/.test(baseName)) return baseName + "es";
-    return baseName + "s";
-}
+// sf CLI + pluralization come from skills/_shared/aep_lib.cjs (issue #22).
+const sf = (command) => sfJson(command, { orgFlag });
 
 function run() {
     // --- Org + installed-version provenance -----------------------------------

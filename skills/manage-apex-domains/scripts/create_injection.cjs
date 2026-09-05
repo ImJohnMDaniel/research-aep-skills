@@ -2,6 +2,7 @@
 const fs = require("fs");
 const path = require("path");
 const readline = require("readline");
+const { parseFlags } = require('../../_shared/aep_lib.cjs');
 
 // --- Argument Parsing ---
 const componentName = process.argv[2];
@@ -22,36 +23,8 @@ if (!isCriteria && !isAction) {
     process.exit(1);
 }
 
-// Parse custom flags
-const args = process.argv.slice(5);
-const flags = {};
-for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg.startsWith('--')) {
-        let key = arg.slice(2);
-        let value = true; // Default to boolean true
-
-        const nextArg = args[i + 1];
-
-        // Case 1: --key=value
-        if (key.includes('=')) {
-            const eqIndex = key.indexOf('=');
-            value = key.substring(eqIndex + 1);
-            key = key.substring(0, eqIndex);
-            
-            if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-            if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
-
-        // Case 2: --key value
-        } else if (nextArg && !nextArg.startsWith('--')) {
-            value = nextArg;
-            i++; 
-        }
-        
-        flags[key] = value;
-    }
-}
+// Parse custom flags (shared lib, issue #22)
+const flags = parseFlags(process.argv.slice(5));
 
 const isNonInteractive = !!(flags.group && flags.ops);
 

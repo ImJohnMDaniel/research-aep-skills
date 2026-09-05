@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("fs");
 const path = require("path");
+const { parseFlags, apexMetaXml } = require('../../_shared/aep_lib.cjs');
 
 // --- Argument Parsing ---
 const componentName = process.argv[2];
@@ -13,24 +14,8 @@ if (!componentName || !sObjectName || !selectorName) {
     process.exit(1);
 }
 
-// Parse custom flags
-const args = process.argv.slice(5); // Start after the main args
-const flags = {};
-for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg.startsWith('--')) {
-        let key = arg.slice(2);
-        let value = true;
-
-        if (key.includes('=')) {
-            [key, value] = key.split('=');
-        } else if (args[i + 1] && !args[i + 1].startsWith('--')) {
-            value = args[i + 1];
-            i++;
-        }
-        flags[key] = value;
-    }
-}
+// Parse custom flags (shared lib, issue #22)
+const flags = parseFlags(process.argv.slice(5));
 flags.selectorName = selectorName; // Add selectorName to flags for consistency
 
 
@@ -165,13 +150,7 @@ async function run() {
 
         // --- 4. Generate Meta Files ---
         [paths.params, paths.method, paths.test].forEach(p => {
-            const metaPath = p + "-meta.xml";
-            const metaContent = `<?xml version="1.0" encoding="UTF-8"?>
-<ApexClass xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>${apiVersion}</apiVersion>
-    <status>Active</status>
-</ApexClass>`;
-            fs.writeFileSync(metaPath, metaContent);
+            fs.writeFileSync(p + "-meta.xml", apexMetaXml("ApexClass", apiVersion));
         });
         
         console.log("\nGeneration complete. No deployment was performed — complete the implementation (including the TODO test-value assignments, which do not compile until filled in), then deploy the created paths explicitly (see SKILL.md, 'Deployment').");

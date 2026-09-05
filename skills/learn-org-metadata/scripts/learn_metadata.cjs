@@ -2,30 +2,10 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-
-// Project-local, self-gitignoring cache (see issue #7 / ADR-0002). The cache
-// is this script's private storage: agents consume the summaries this script
-// PRINTS, never the cache files directly — some platforms' agent file tools
-// refuse to read git-ignored paths, but a script's own fs access (and its
-// stdout) is unrestricted everywhere.
-function ensureAepCacheDir(subpath) {
-    const aepDir = path.join(process.cwd(), '.aep');
-    const dir = path.join(aepDir, 'cache', subpath);
-    fs.mkdirSync(dir, { recursive: true });
-    const selfIgnore = path.join(aepDir, '.gitignore');
-    if (!fs.existsSync(selfIgnore)) fs.writeFileSync(selfIgnore, '*\n');
-    return dir;
-}
-
-// Compact schema summary printed to stdout — this is the supported read path.
-function renderDescribeSummary(describe) {
-    const lines = [`## ${describe.name} (${describe.label})`];
-    for (const f of describe.fields || []) {
-        const refs = (f.referenceTo && f.referenceTo.length) ? ` -> ${f.referenceTo.join(', ')}` : '';
-        lines.push(`- ${f.name}: ${f.type}${f.length ? `(${f.length})` : ''}${refs}`);
-    }
-    return lines.join('\n');
-}
+// Cache + rendering helpers come from skills/_shared/aep_lib.cjs (issue #22).
+// The cache is script-private storage (issue #7 / ADR-0002): agents consume
+// the summaries this script PRINTS, never the cache files directly.
+const { ensureAepCacheDir, renderDescribeSummary } = require('../../_shared/aep_lib.cjs');
 
 /**
  * Usage:

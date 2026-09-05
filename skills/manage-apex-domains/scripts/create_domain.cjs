@@ -3,39 +3,14 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 const readline = require('readline');
+const {
+    parseFlags, getPlural, validateIdentifier, enforceLimit,
+    isSupportedByMetadataRelationship, ownershipGuardrail,
+    createFileIfMissing, apexMetaXml
+} = require('../../_shared/aep_lib.cjs');
 
 const sObjectName = process.argv[2];
-
-// Parse custom flags
-const args = process.argv.slice(3);
-const flags = {};
-for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg.startsWith('--')) {
-        let key = arg.slice(2);
-        let value = true; // Default to boolean true
-
-        const nextArg = args[i + 1];
-
-        // Case 1: --key=value
-        if (key.includes('=')) {
-            const eqIndex = key.indexOf('=');
-            value = key.substring(eqIndex + 1);
-            key = key.substring(0, eqIndex);
-            
-            if (value.startsWith('"') && value.endsWith('"')) value = value.slice(1, -1);
-            if (value.startsWith("'") && value.endsWith("'")) value = value.slice(1, -1);
-
-        // Case 2: --key value
-        } else if (nextArg && !nextArg.startsWith('--')) {
-            value = nextArg;
-            i++; 
-        }
-        
-        flags[key] = value;
-    }
-}
+const flags = parseFlags(process.argv.slice(3));
 
 let appPrefix = flags.prefix;
 
@@ -57,100 +32,21 @@ if (!appPrefix) {
 
 // ARCHITECTURAL GUARDRAIL (Single-Ownership Principle, ADR-0007): a Domain may
 // be created only by the SObject's owning package.
-const sObjectIsCustomShaped = /__(c|pc|mdt|e|Share|History|ChangeEvent)$/.test(sObjectName);
-const sObjectPrefixMatch = sObjectName.match(/^([A-Za-z0-9]+)_.+__/);
-const sObjectPrefix = sObjectIsCustomShaped && sObjectPrefixMatch ? sObjectPrefixMatch[1] : null;
-
-if (!sObjectIsCustomShaped && !flags['confirm-ownership']) {
-    console.error(`ARCHITECTURAL GUARDRAIL: ${sObjectName} is a standard SObject. A Domain may be created only in the SObject's owning package.`);
-    console.error(`Resolve ownership first (project context file's AEP Conventions section + org discovery). If the owner is another package, extend it via Domain Process Injection instead. If the developer confirms THIS project owns ${sObjectName}, re-run with --confirm-ownership.`);
-    process.exit(1);
-}
-if (sObjectPrefix && appPrefix && sObjectPrefix !== appPrefix) {
-    console.error(`ARCHITECTURAL GUARDRAIL: ${sObjectName} carries prefix "${sObjectPrefix}", which is not this project's prefix ("${appPrefix}") — the SObject is owned by another package.`);
-    console.error(`Do not create a local Domain for it. Extend the owning package's domain via Domain Process Injection instead.`);
+const guardrail = ownershipGuardrail({
+    sObjectName, appPrefix,
+    confirmOwnership: !!flags['confirm-ownership'],
+    layer: 'Domain', injectionPattern: 'Domain Process Injection'
+});
+if (guardrail.refused) {
+    guardrail.messages.forEach(m => console.error(m));
     process.exit(1);
 }
 
-function getPlural(name) {
-    // Correctly handle standard suffixes before pluralizing
-    const suffixes = ["__c", "__pc", "__mdt", "__e", "__Share", "__History", "__ChangeEvent"];
-    let baseName = name;
-    let suffix = "";
-
-    for (const s of suffixes) {
-        if (name.endsWith(s)) {
-            baseName = name.slice(0, -s.length);
-            suffix = s;
-            break;
-        }
-    }
-
-    let pluralBase;
-    if (baseName.endsWith("y")) {
-        pluralBase = baseName.slice(0, -1) + "ies";
-    } else if (baseName.endsWith("s") || baseName.endsWith("sh") || baseName.endsWith("ch") || baseName.endsWith("x") || baseName.endsWith("z")) {
-        pluralBase = baseName + "es";
-    } else {
-        pluralBase = baseName + "s";
-    }
-
-    // Special handling for __Share which becomes Shares — without this, the
-    // __Share domain name collides with the base SObject's domain class name
-    if (suffix === "__Share") {
-        return baseName + "Shares";
-    }
-
-    // Domain classes are just plural, keep original suffix
-    return pluralBase;
-}
-
+// Naming, guardrail, and file helpers come from skills/_shared/aep_lib.cjs
+// (issue #22); see test/aep_lib.test.cjs for their behavior.
 function sanitizeName(name) {
     // No longer need to remove suffixes here as getPlural handles them
     return name;
-}
-
-function validateIdentifier(name) {
-    if (name.includes("__")) {
-        throw new Error(`Generated name "${name}" is invalid because it contains a double underscore. Please check the script's naming logic.`);
-    }
-    if (name.length > 40) {
-        // This is a separate check from enforceLimit, more of a hard stop
-        throw new Error(`Generated name "${name}" exceeds the 40-character limit for Apex class names.`);
-    }
-}
-
-function enforceLimit(name, suffix = "") {
-    const limit = 40;
-    const testSuffix = suffix === "Test" ? "Test" : "";
-    if (name.length + testSuffix.length <= limit) return name + testSuffix;
-    const parts = name.split("_");
-    const prefix = parts[0] + "_";
-    const remainder = name.substring(prefix.length);
-    const availableSpace = limit - prefix.length - testSuffix.length;
-    return prefix + remainder.substring(0, availableSpace) + testSuffix;
-}
-
-function isSupportedByMetadataRelationship(name) {
-    if (name.endsWith("__c") || name.endsWith("__pc")) return true;
-    const unsupported = ["User", "PermissionSet", "PermissionSetGroup"];
-    if (unsupported.includes(name)) return false;
-    if (name.endsWith("Share")) return false;
-    return true;
-}
-
-// Create-only semantics: the file is created from the template when missing.
-// Existing files are NEVER modified — reconciling an existing class with
-// current conventions is the agent's responsibility (see SKILL.md,
-// "Reconciling Existing Files").
-function createFileIfMissing(filePath, templateIfMissing) {
-    if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, templateIfMissing);
-        console.log(` - Created: ${filePath}`);
-        return true;
-    }
-    console.log(` - Exists, skipped (existing files are never modified): ${filePath}`);
-    return false;
 }
 
 async function run() {
@@ -267,11 +163,7 @@ async function run() {
             const metaPath = paths[key] + "-meta.xml";
             if (!fs.existsSync(metaPath)) {
                 const type = key === "trigger" ? "ApexTrigger" : "ApexClass";
-                fs.writeFileSync(metaPath, `<?xml version="1.0" encoding="UTF-8"?>
-<${type} xmlns="http://soap.sforce.com/2006/04/metadata">
-    <apiVersion>${apiVersion}</apiVersion>
-    <status>Active</status>
-</${type}>`);
+                fs.writeFileSync(metaPath, apexMetaXml(type, apiVersion));
             }
         });
 

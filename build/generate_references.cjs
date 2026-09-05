@@ -50,12 +50,9 @@ function fail(msg) {
     process.exit(1);
 }
 
-function sf(command) {
-    const out = execSync(`sf ${command} --json`, EXEC_OPTS);
-    const parsed = JSON.parse(out);
-    if (parsed.status !== 0) throw new Error(`sf ${command} returned status ${parsed.status}`);
-    return parsed.result;
-}
+// sf CLI wrapper + symbol-rendering primitives from skills/_shared/aep_lib.cjs (issue #22)
+const { sfJson, isVisible, signature } = require('../skills/_shared/aep_lib.cjs');
+const sf = (command) => sfJson(command);
 
 // --- Load configuration -----------------------------------------------------
 const sources = JSON.parse(fs.readFileSync(path.join(BUILD_DIR, 'framework-sources.json'), 'utf8'));
@@ -168,18 +165,6 @@ function extractMetadataTypes(org) {
 // --- Step 6: render markdown --------------------------------------------------
 function provenance(fw, subject) {
     return `<!-- GENERATED FILE - do not edit by hand.\n     Source: ${fw.repo} @ ${fw.commit} (${subject})\n     Generated: ${generatedAt} by build/generate_references.cjs (ADR-0008) -->\n`;
-}
-
-function isVisible(modifiers) {
-    const mods = modifiers || [];
-    return !mods.includes('private') && !mods.includes('testMethod');
-}
-
-function signature(m, withReturn) {
-    const mods = (m.modifiers || []).join(' ');
-    const params = (m.parameters || []).map(p => `${p.type} ${p.name}`).join(', ');
-    const ret = withReturn && m.returnType ? `${m.returnType} ` : '';
-    return `${mods ? mods + ' ' : ''}${ret}${m.name}(${params})`;
 }
 
 function renderTableSection(table, depth) {
