@@ -27,7 +27,7 @@ Note: onboarding an org's unpackaged "Happy Soup" repository (the one project th
 ## The Interview
 
 1. **Check existing state.** If a complete `## AEP Conventions` section exists, offer a review/refresh instead of a fresh interview. Compare each Dependencies version snapshot against `sfdx-project.json`; report any drift.
-2. **Project prefix.** Infer a candidate by scanning the default package directory (from `sfdx-project.json`) for prefixed classes/objects, offer it for confirmation, and ask if nothing can be inferred.
+2. **Project identity.** Two questions: (a) **Project prefix** — infer a candidate by scanning the default package directory (from `sfdx-project.json`) for prefixed classes/objects, offer it for confirmation, and ask if nothing can be inferred. (b) **This package's layer** — which ecosystem layer THIS project occupies; accept only the blessed taxonomy values (Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Integration).
 3. **Dependency review.** Read the `dependencies` (and `packageAliases`) from `sfdx-project.json`. Present **ALL** of them to the developer as a review table — name | layer | purpose | prefix | version — with every cell you inferred labeled `(proposed — confirm)` and every cell you cannot infer left visibly blank. Ask the developer to confirm or correct **each row**; do not proceed to step 4 while any row remains unconfirmed. The fields, per dependency:
    - **Purpose** — one line, in their words: why is this dependency present?
    - **Layer** — place it in the ecosystem taxonomy (offer an inferred guess where the name or purpose makes it obvious): **Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Third-Party Managed / Integration**. (A Single-Org ecosystem simply has no Universal Common tier.)
@@ -45,6 +45,7 @@ Note: onboarding an org's unpackaged "Happy Soup" repository (the one project th
 ## AEP Conventions
 
 - Project prefix: ACME
+- This package's layer: Business
 - Standard SObjects are managed by: CMN (common-core package)
 - Dependencies:
   - Framework:

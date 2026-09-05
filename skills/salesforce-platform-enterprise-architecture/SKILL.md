@@ -21,20 +21,22 @@ Precedence and scope:
 
 ## The AEP Conventions hint section
 
-The project declares the two facts that cannot be derived from code or org in a short section of its context file (`CLAUDE.md`/`GEMINI.md`):
+The project declares the facts that cannot be derived from code or org in a short section of its context file (`CLAUDE.md`/`GEMINI.md`):
 
 ```markdown
 ## AEP Conventions
 
 - Project prefix: ACME
+- This package's layer: Business
 - Standard SObjects are managed by: CMN (common-core package)
 ```
 
 - **Project prefix** — the prefix this project owns. Pass it to generator scripts via `--prefix`.
+- **This package's layer** — which ecosystem layer THIS project occupies, one of the blessed taxonomy values (Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Integration). Non-derivable; established at onboarding. Used for layer-appropriateness advice — e.g., services belong in Business or Project Common packages, occasionally an Integration (API-layer) package, and rarely elsewhere.
 - **Standard SObjects are managed by** — the prefix (optionally with package name) of the package responsible for standard SObjects. The value may be `this project` for a standalone project that owns them itself, or a mapping when ownership is split (e.g., `User, Task: CMN; Product2: PRICING`).
 - **Dependencies** (established and maintained by the `onboard-project` skill; a project may not have this subsection *yet*, but producing it is a REQUIRED step of onboarding — never a skippable one) — the project's dependencies grouped by ecosystem layer (Framework / Universal Common / Org-wide Common / Project Common / Business / Third-Party Extension / Third-Party Managed / Integration), each line carrying the package's prefix, the declared version snapshot, and its purpose — e.g., `- docusign-ext (DSX) @ 1.2.0: AEP layers (selectors/domains) for DocuSign (dsfs__) objects`. Third-Party Extension lines declare which managed-package namespace's AEP layers that extension owns. Framework lines record whether the entry maps to one of the plugin's bundled tier-1 reference sets (the four AEP frameworks, often consumed as renamed private clones — the mapping is developer-confirmed, never assumed from names); every dependency NOT so mapped gets a tier-2 inventory, regardless of layer.
 
-**If the section is missing from the project context file, do not guess.** Ask the developer these two questions, then — with their confirmation — write the `## AEP Conventions` section into the project context file before proceeding.
+**If the section is missing from the project context file, do not guess.** Ask the developer these questions, then — with their confirmation — write the `## AEP Conventions` section into the project context file before proceeding.
 
 **Example placeholders:** throughout this skill and its companion skills, `ACME` stands for the project's own prefix and `CMN` for the package that manages Standard SObjects — always meaning *whatever the project context file declares*, never literal names.
 
