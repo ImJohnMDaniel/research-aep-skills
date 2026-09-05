@@ -80,6 +80,11 @@
             "ApplicationFactory_DomainBinding__mdt", "DomainProcessBinding__mdt",
             "ApplicationFactory_UnitOfWorkBinding__mdt"
         ],
+        "manage-apex-services": [
+            "Application", "fflib_Application",
+            "IApplicationSObjectUnitOfWork",
+            "ApplicationFactory_ServiceBinding__mdt"
+        ],
         "manage-apex-selectors": [
             "fflib_ISObjectSelector", "fflib_SObjectSelector", "fflib_QueryFactory",
             "ApplicationSObjectSelector", "IApplicationSObjectSelector",

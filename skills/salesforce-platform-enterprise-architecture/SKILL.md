@@ -9,7 +9,7 @@ description: High-level management of Salesforce Apex Enterprise Patterns (fflib
 
 Precedence and scope:
 
-1. **Between skills:** each specialized skill (`manage-apex-domains`, `manage-apex-selectors`) governs its own layer; this skill governs cross-cutting concerns. Where they overlap, the more specific skill wins for its layer.
+1. **Between skills:** each specialized skill (`manage-apex-domains`, `manage-apex-selectors`, `manage-apex-services`) governs its own layer; this skill governs cross-cutting concerns. Where they overlap, the more specific skill wins for its layer.
 2. **Mandates are normative, not descriptive:** existing code that violates a mandate is refactoring debt to surface — it is NOT evidence against the mandate.
 3. **Observed facts beat factual claims:** if a factual claim in this skill (a script's behavior, a filename, a path) contradicts what you observe in the repo, org, or script output, trust the observation and report the discrepancy to the user rather than acting as if this document were correct.
 
@@ -115,6 +115,7 @@ Before proposing to modify any Apex code, you MUST perform and explicitly state 
 **E. Mandatory Co-Activation for SObject Logic Analysis**
    - When a task involves analyzing or modifying **Apex Triggers** or SObject business logic, you **MUST** immediately co-activate the `manage-apex-domains` skill.
    - When a task involves analyzing or modifying **SOQL queries** or data access patterns, you **MUST** immediately co-activate the `manage-apex-selectors` skill.
+   - When a task involves creating or modifying **business-process orchestration, service classes, or cross-domain logic**, you **MUST** immediately co-activate the `manage-apex-services` skill.
 
 A complete and accurate analysis requires the specialized knowledge from these skills from the very beginning of the task, not just during implementation. This is not optional.
 
@@ -139,7 +140,7 @@ Follow this procedure:
 
 ## Core Architectural Layers
 
-1.  **Service Layer**: Encapsulates business processes and orchestration.
+1.  **Service Layer**: Encapsulates business processes and orchestration — aggregate in nature, spanning multiple domains, callouts/integrations, and other services. Managed via `manage-apex-services`.
 2.  **Domain Layer**: Encapsulates SObject-specific validation, defaults, and business logic. Managed via `manage-apex-domains`.  Apex Triggers should use the SObject's associated Domain class for all busines logic.
 3.  **Selector Layer**: Encapsulates SOQL queries, ensuring consistency and security. Managed via `manage-apex-selectors`.
 4.  **Unit of Work Layer**: Manages DML operations to ensure they are executed as a single, atomic transaction that can be rolled back on failure. All DML **MUST** be performed using this layer.
@@ -323,9 +324,18 @@ Use this pattern to add logic to existing Domains owned by other packages (such 
 - **Redundancy**: If a redundant trigger exists, you MUST recommend **removing** it and using Domain Process Injection instead.
 - **Selector Discovery**: Use `learn-org-metadata` to populate field lists for dependency selectors.
 
+## Development-Environment Binding Substitution
+
+`Priority__c` exists on exactly two binding types — **`ApplicationFactory_SelectorBinding__mdt`** and **`ApplicationFactory_ServiceBinding__mdt`** (neither the domain nor the UOW binding has it). It enables development-environment substitution:
+
+- A development-only package directory in `sfdx-project.json` (an integration/test harness that is never shipped in a package version) may carry a binding for the same interface/SObject with an explicit priority. **Lower number = higher priority, and nil — the default every generated binding uses — is always the LOWEST**, so any explicit value automatically wins inside the org it is deployed to.
+- Use cases: a substitute service implementation for development, or a stub selector returning explicit canned datasets instead of querying an empty scratch-org database — behavior substitution with **zero code changes**, scoped entirely by what metadata deploys where.
+- **Production-time override is forbidden.** A consuming package must never ship a higher-priority binding to displace a dependency package's live implementation. This mechanism is strictly for development (and potentially testing) purposes.
+
 ## Integration with Specialized Skills
 - Use **`manage-apex-domains`** to create/update Domain classes, Triggers, and Injected components (Criteria/Actions).
 - Use **`manage-apex-selectors`** to create/update Selector classes.
+- Use **`manage-apex-services`** to create Service layers (facade, interface, implementation, exception, binding).
 - Use **`learn-org-metadata`** to retrieve schema details before implementation.
 - Use **`learn-org-symbol-table`** to discover Apex class structures from the org.
 

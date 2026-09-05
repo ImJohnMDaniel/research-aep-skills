@@ -5,6 +5,7 @@ A Salesforce 2GP unlocked package project.
 ## AEP Conventions
 
 - Project prefix: ACME
+- This package's layer: Business
 - Standard SObjects are managed by: CMN (common-core package)
 - Dependencies:
   - Framework:
