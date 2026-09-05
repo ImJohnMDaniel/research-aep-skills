@@ -5,7 +5,7 @@ This guide details the implementation of Apex Enterprise Patterns using the **AT
 ## Service Layer
 - **Responsibility**: Business logic orchestration and transaction management.
 - **Implementation**: Implementation class + Interface (e.g., `IAccountsService`).
-- **Registration**: Registered in `ApplicationServiceDIModule`.
+- **Registration**: Registered via an `ApplicationFactory_ServiceBinding__mdt` custom metadata record (`BindingInterface__c` = the service interface, `To__c` = the implementation class), consistent with the domain/selector binding pattern.
 - **Calling**: Always via the `Application` factory:
   ```apex
   IAccountsService service = (IAccountsService) Application.Service.newInstance(IAccountsService.class);
