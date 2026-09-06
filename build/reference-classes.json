@@ -83,6 +83,7 @@
         "manage-apex-services": [
             "Application", "fflib_Application",
             "IApplicationSObjectUnitOfWork",
+            "fflib_ISObjectUnitOfWork", "fflib_SObjectUnitOfWork",
             "ApplicationFactory_ServiceBinding__mdt"
         ],
         "manage-apex-selectors": [
