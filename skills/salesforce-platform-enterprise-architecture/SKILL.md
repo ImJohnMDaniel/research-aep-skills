@@ -146,25 +146,38 @@ Follow this procedure:
 4.  **Unit of Work Layer**: Manages DML operations to ensure they are executed as a single, atomic transaction that can be rolled back on failure. All DML **MUST** be performed using this layer.
 
     ### Unit of Work Mandates
-    There are two distinct and valid contexts for using the Unit of Work. You MUST identify the context you are in and use the correct pattern.
+    **For the full worked patterns, read [uow-patterns.md](references/uow-patterns.md) before writing UOW code.** The mandates:
 
-    #### 1. Inside a Domain Process Action
-    When your code is inside a class that extends `DomainProcessAbstractAction`, the framework automatically manages the Unit of Work lifecycle for you.
-    - The `DomainProcessCoordinator` instantiates a `IApplicationSObjectUnitOfWork` and injects it into your action.
-    - You **MUST NOT** create a new Unit of Work instance.
-    - You **MUST NOT** call `commitWork()`.
-    - Your only responsibility is to register records with the provided instance: `this.uow.registerDirty(record);` or `this.uow.registerNew(record);`.
+    #### Transaction boundary ownership — the four cases
+    | Flow | Boundary owner |
+    | --- | --- |
+    | Service-entry | The **outermost service**: creates the UOW, passes it DOWN as a parameter to finer-grained services and domain methods, commits at the end |
+    | Trigger-after context (after insert/update) | The **domain process/method** may own a **secondary** boundary: creates and commits its own UOW — no service sits above it in this flow |
+    | Synchronous Domain Process Action | The **coordinator's** UOW is injected (`this.uow`); the Action registers work and **MUST NOT** create a UOW or call `commitWork()` |
+    | Asynchronous Domain Process Action | The **framework automatically** creates and commits a UOW per queueable execution |
 
-    #### 2. Inside a Service or Domain Class
-    When your code is in a higher-level business logic class (like a Service method) that is NOT part of an automated trigger process, you are responsible for managing the transaction.
-    - You **MUST** manually instantiate a `IApplicationSObjectUnitOfWork` Unit of Work instance via `Application.UnitOfWork.newInstance()`.
-    - You **MUST** call `uow.commitWork();` at the end of your logic to save the changes to the database.
+    **The signature is the contract:** a method without a UOW parameter is top-tier (owns the boundary); a method with `IApplicationSObjectUnitOfWork uow` as its (conventionally last) parameter participates and never commits. One form per method.
+
+    #### Instantiation and DML mode
+    - Instantiate via `Application.UnitOfWork.newInstance()` — the SObjectType order comes from the org's binding records.
+    - **Prefer user-mode DML where possible:** `newInstance(new fflib_SObjectUnitOfWork.UserModeDML())`. The framework default remains `SimpleDML` (system mode) for backward compatibility; system mode stays legitimate where elevated context is genuinely required.
+
+    #### Registration
+    - Preferred under AT4DX: the smart `register()` family (Id-dispatching, mixed-list friendly). The explicit fflib methods (`registerNew`/`registerDirty`/`registerDeleted`) are equally acceptable and the more **intent-explicit** choice.
+    - Children referencing not-yet-committed parents use the relationship-registering forms — which is why the DML sequence orders **parents before children**.
+
+    #### Platform events — choose the bus by intent
+    - `AT4DXMessage__e` (delivered after commit; dies with a rollback): publish **through the UOW** (`registerPublishAfterSuccessTransaction`), for uniformity.
+    - `AT4DXImmediateMessage__e` (delivered immediately; survives rollback): publish **directly via `EventBus.publish()`**, never through the UOW.
+
+    #### Blessed exceptions to "all DML through the UOW"
+    `Database.convertLead` and approval submissions. For such work that should still join the commit sequence, `fflib_SObjectUnitOfWork.IDoWork` + `uow.registerWork(...)` is the framework-provided extension seam.
 
     ### The DML Execution Sequence
-    The `ApplicationFactory_UnitOfWorkBinding__mdt` custom metadata type **DOES NOT** bind Apex classes. Its sole purpose is to define the global, application-wide DML execution order.
-    - To prevent runtime errors, any custom SObject that needs to be used in a Unit of Work **MUST** have a corresponding record in this metadata type defining its sequence in the transaction.
-    - Use the `get_uow_sequence.cjs` script to view the current order before adding a new binding.
-    - The `create_domain.cjs` script will automatically prompt you to create this binding when you create a new Domain for a custom SObject. For non-interactive execution, you can provide the `--uow-sequence=<Number>` flag.
+    The `ApplicationFactory_UnitOfWorkBinding__mdt` custom metadata type **DOES NOT** bind Apex classes. Its sole purpose is to define the global, org-wide DML execution order, assembled from records contributed by every package in the ecosystem.
+    - To prevent runtime errors, any custom SObject used in a Unit of Work **MUST** have a record defining its sequence. **Standard SObjects' records are contributed by the package that manages them.**
+    - Choosing a number: run `<manage-apex-domains skill>/scripts/get_uow_sequence.cjs` to read the live order from the org, then pick a **sensibly-gapped** number respecting parents-before-children (real-world gaps run to hundreds or thousands for insertion room; no reserved-range-per-package convention exists; same-number ties across packages are harmless).
+    - The `create_domain.cjs` script creates this binding with a new Domain for a custom SObject via the `--uow-sequence=<Number>` flag.
 
 ## Architectural Mandates
 
@@ -342,6 +355,7 @@ Use this pattern to add logic to existing Domains owned by other packages (such 
 ## References
 
 - [at4dx-patterns.md](references/at4dx-patterns.md): Detailed implementation guide.
+- [uow-patterns.md](references/uow-patterns.md): The full Unit of Work usage canon — instantiation matrix, DML modes, boundary ownership, registration surface, introspection, the two-bus platform-event canon, blessed exceptions, and sequence guidance.
 - **Bundled framework API references** (provenance-stamped, one file per class; see `xdocs/adr/0008`):
   - Unit of Work: `references/fflib-apex-common/fflib_ISObjectUnitOfWork.md`, `fflib_SObjectUnitOfWork.md`; `references/at4dx/IApplicationSObjectUnitOfWork.md`, `ApplicationSObjectUnitOfWork.md`, `ApplicationFactory_UnitOfWorkBinding__mdt.md`
   - Application factories: `references/fflib-apex-common/fflib_Application.md`; `references/at4dx/Application.md`
