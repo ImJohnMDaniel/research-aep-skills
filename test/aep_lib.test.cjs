@@ -56,13 +56,38 @@ test('validateIdentifier: rejects double underscores and >40 chars', () => {
 });
 
 // --- isSupportedByMetadataRelationship ---------------------------------------------
-test('isSupportedByMetadataRelationship: platform restrictions encoded', () => {
+// Provenance: Salesforce Help, custommetadatatypes_relationships_limits.htm
+// (release 260) — see the list and criteria comments in aep_lib.cjs (issue #17).
+test('isSupportedByMetadataRelationship: supported entities', () => {
     assert.equal(lib.isSupportedByMetadataRelationship('ACME_Invoice__c'), true);
     assert.equal(lib.isSupportedByMetadataRelationship('Account'), true);
-    assert.equal(lib.isSupportedByMetadataRelationship('User'), false);
-    assert.equal(lib.isSupportedByMetadataRelationship('PermissionSet'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('Contact'), true);
+    assert.equal(lib.isSupportedByMetadataRelationship('Case'), true);
+});
+
+test('isSupportedByMetadataRelationship: Help-page explicit unsupported list', () => {
+    for (const name of ['User', 'PermissionSet', 'Task', 'Event', 'Activity', 'Holiday',
+        'Group', 'GroupMember', 'UserRole', 'QueueSObject', 'FieldPermissions',
+        'ObjectPermissions', 'PermissionSetAssignment', 'SetupEntityAccess',
+        'Territory', 'Territory2', 'Territory2Model', 'UserTerritory', 'SignupRequest']) {
+        assert.equal(lib.isSupportedByMetadataRelationship(name), false, name);
+    }
+});
+
+test('isSupportedByMetadataRelationship: criteria-derived and empirical exclusions', () => {
+    assert.equal(lib.isSupportedByMetadataRelationship('PermissionSetGroup'), false);
+    // System tables: share/history/change-event/feed, standard and custom-suffixed
     assert.equal(lib.isSupportedByMetadataRelationship('AccountShare'), false);
     assert.equal(lib.isSupportedByMetadataRelationship('ACME_Invoice__Share'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('AccountHistory'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('ACME_Invoice__History'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('AccountChangeEvent'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('ACME_Invoice__ChangeEvent'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('AccountFeed'), false);
+    // Empirical (original skill draft), kept under the fail-safe bias
+    assert.equal(lib.isSupportedByMetadataRelationship('ContentDocument'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('ContentVersion'), false);
+    assert.equal(lib.isSupportedByMetadataRelationship('ContentDocumentLink'), false);
 });
 
 // --- ownershipGuardrail -------------------------------------------------------------

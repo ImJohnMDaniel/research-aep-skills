@@ -237,17 +237,21 @@ This configuration correctly tells the framework: "For `After_Update` on `User`,
 
 
 ### CRITICAL: Binding to SObjects with Metadata Relationship Limitations
-The `DomainProcessBinding__mdt` object uses a "Metadata Relationship" field, `RelatedDomainBindingSObject__c`, to link to the SObject's domain definition in `ApplicationFactory_DomainBinding__mdt`. Due to Salesforce platform restrictions, this field type cannot reference certain standard SObjects.
 
-These objects include, but are not limited to:
-- `User`
-- `Task`
-- `ContentVersion`
-- `ContentDocument`
-- `ContentDocumentLink`
-- All "Share" objects related to a standard SObject or a custom SObject and the metadata API name ends with "Share"  (i.e. `AccountShare`, `ACME_AccommRequest__Share`, etc. )
+The AT4DX binding metadata types reference their SObject through a "Metadata Relationship" custom field (EntityDefinition domain), and each carries a paired plain-text fallback for the SObjects the platform will not allow the relationship field to reference:
 
-When creating a `DomainProcessBinding__mdt` record for one of these SObjects, you **MUST NOT** populate the `RelatedDomainBindingSObject__c` field. Instead, you **MUST** populate the alternate text field, **`RelatedDomainBindingSObjectAlternate__c`**, with the SObject's API name as a string (e.g., `<value xsi:type="xsd:string">User</value>`). The script handles this for you.
+| Metadata type | Relationship field | Text fallback |
+| --- | --- | --- |
+| `ApplicationFactory_DomainBinding__mdt`, `ApplicationFactory_SelectorBinding__mdt`, `ApplicationFactory_UnitOfWorkBinding__mdt` | `BindingSObject__c` | `BindingSObjectAlternate__c` |
+| `DomainProcessBinding__mdt` | `RelatedDomainBindingSObject__c` | `RelatedDomainBindingSObjectAlternate__c` |
+
+**Why:** the platform restricts which entities an EntityDefinition-domain metadata relationship may reference. The authoritative rule is documented in Salesforce Help, "Custom Metadata Relationship Considerations" (custommetadatatypes_relationships_limits.htm): the entity must be publicly exposed, API-queryable, Apex-triggerable, customizable, and layoutable; not part of a union (task/activity/event/holiday); and not a setup entity. That page also names an explicit unsupported list (`User`, `Task`, `Event`, `Group`, `UserRole`, the permission and Territory entities, and more).
+
+**The single source of truth in this plugin is `isSupportedByMetadataRelationship()`** in the shared script library — it encodes the Help page's explicit list, the criteria-derived exclusions (share, history, change-event, and feed system tables; `PermissionSetGroup`), and empirically reported cases (the `Content*` document entities), with provenance comments. The generator scripts call it to decide which field of the pair to populate — you never make this decision manually when a script is generating the binding.
+
+**When YOU author or reconcile a binding record by hand:** populate exactly one field of the pair. Use the relationship field when the SObject is supported (it gives referential integrity and packaging validation); use the text fallback with the SObject's API name as a string (e.g., `<value xsi:type="xsd:string">User</value>`) when it is not. AT4DX resolves bindings through either field at runtime, so a wrongly-guessed "unsupported" merely loses referential integrity, while a wrongly-guessed "supported" fails the deploy — when in doubt, use the text fallback.
+
+**Escape hatch:** if a deployment ever rejects a relationship-field value for an SObject the library classifies as supported, switch that binding record to the text fallback and report the SObject to the developer as a candidate addition to the library's list.
 
 ## Architectural Mandates
 

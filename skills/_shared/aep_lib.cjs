@@ -80,11 +80,44 @@ function enforceLimit(name, suffix = "") {
     return prefix + remainder.substring(0, availableSpace) + testSuffix;
 }
 
+// Can an EntityDefinition-domain metadata relationship field (BindingSObject__c on
+// the ApplicationFactory_*Binding__mdt types; RelatedDomainBindingSObject__c on
+// DomainProcessBinding__mdt) reference this SObject? When not, the generators
+// populate the paired *Alternate__c text field instead (issue #17).
+//
+// Provenance: "Custom Metadata Relationship Considerations", Salesforce Help,
+// custommetadatatypes_relationships_limits.htm (release 260, verified 2026-09-07).
+// The platform's criteria: the entity must be publicly exposed, API-queryable,
+// Apex-triggerable, customizable, and layoutable; not part of a union
+// (task/activity/event/holiday); not a setup entity.
+//
+// Fail-safe bias: AT4DX resolves bindings through EITHER field at runtime (see
+// DomainProcessCoordinator), so wrongly classifying an object as unsupported only
+// costs referential integrity, while wrongly classifying it as supported fails the
+// deploy. When in doubt, classify as unsupported.
+const METADATA_RELATIONSHIP_UNSUPPORTED = new Set([
+    // Explicitly listed as unsupported by the Help page:
+    'Task', 'Event', 'Activity', 'Holiday',          // activity/union entities
+    'SignupRequest',                                 // Trialforce
+    'FieldPermissions', 'Group', 'GroupMember', 'ObjectPermissions',
+    'PermissionSet', 'PermissionSetAssignment', 'QueueSObject',
+    'SetupEntityAccess', 'User', 'UserRole', 'UserTerritory', 'Territory',
+    'Territory2', 'Territory2Model', 'ObjectTerritory2AssignmentRule',
+    'ObjectTerritory2AssignmentRuleItem', 'RuleTerritory2Association',
+    'UserTerritory2Association',
+    // Derived from the criteria (setup entity, like PermissionSet):
+    'PermissionSetGroup',
+    // Empirical — reported unsupported in the original skill draft; kept under the
+    // fail-safe bias (not on the Help page's explicit list):
+    'ContentDocument', 'ContentVersion', 'ContentDocumentLink'
+]);
+
 function isSupportedByMetadataRelationship(name) {
     if (name.endsWith("__c") || name.endsWith("__pc")) return true;
-    const unsupported = ["User", "PermissionSet", "PermissionSetGroup"];
-    if (unsupported.includes(name)) return false;
-    if (name.endsWith("Share")) return false;
+    if (METADATA_RELATIONSHIP_UNSUPPORTED.has(name)) return false;
+    // System tables fail the criteria (not customizable/layoutable): standard and
+    // custom share, history, change-event, and feed objects.
+    if (/(Share|History|ChangeEvent|Feed)$/.test(name)) return false;
     return true;
 }
 
