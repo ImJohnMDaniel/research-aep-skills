@@ -137,20 +137,32 @@ Your workflow is as follows:
     *   `SObjectName`: The API name of the SObject being targeted (e.g., `User`, `Account`).
     *   `Type`: The type of injection, either `Criteria` or `Action`.
     *   `ProcessGroup`: The integer that groups this logic with other injections (e.g., `10`, `20`). You should analyze existing bindings in the `main/schema/customMetadata/domainProcessBindings/` folder under the default package directory declared in `sfdx-project.json` to choose a logical group number.
-    *   `TriggerOps`: A comma-separated string of the trigger operations this injection applies to (e.g., `"After_Insert,After_Update"`).
+    *   `Context`: `TriggerExecution` (the default) or `DomainMethodExecution` (see "Domain Method Execution" below). The context determines the keying flag:
+        *   `TriggerOps` (TriggerExecution only): a comma-separated string of the trigger operations this injection applies to (e.g., `"After_Insert,After_Update"`). Rejected for `DomainMethodExecution`.
+        *   `Token` (DomainMethodExecution only): the domain method token this injection binds to (e.g., `GenerateSlogans`). Required for `DomainMethodExecution`; rejected for `TriggerExecution`.
     *   `Order`: The execution order number. You MUST calculate this by finding the highest existing order number within your chosen `ProcessGroup` and incrementing the decimal by 0.1. For example, if the highest existing order is `10.2`, your new order should be `10.3`.
 
 2.  **Construct and Execute Command:** Assemble the final command using the non-interactive flags.
 
-    **Full Command Template:**
+    **Full Command Template (trigger context):**
     ```bash
     node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> --group <ProcessGroup> --ops "<TriggerOps>" --order <Order> [--async]
     ```
 
-    **Example:**
+    **Full Command Template (domain method context):**
+    ```bash
+    node ./scripts/create_injection.cjs <ComponentName> <SObjectName> <Type> --group <ProcessGroup> --context=DomainMethodExecution --token=<TokenName> --order <Order> [--async]
+    ```
+
+    **Examples:**
     ```bash
     # This command creates a Criteria class and its binding metadata non-interactively.
     node ./scripts/create_injection.cjs ACME_UserIsActiveCriteria User Criteria --group 10 --ops "After_Update,After_Insert" --order 10.2
+    ```
+    ```bash
+    # Criteria + Action bound to a domain method token (one binding record each).
+    node ./scripts/create_injection.cjs ACME_FishNameCriteria Account Criteria --group 10 --context=DomainMethodExecution --token=GenerateSlogans --order 10.1
+    node ./scripts/create_injection.cjs ACME_SloganAction Account Action --group 10 --context=DomainMethodExecution --token=GenerateSlogans --order 10.2
     ```
 3.  **Verify:** After execution, verify that the new Apex class and the corresponding `DomainProcessBinding__mdt.xml` file(s) have been created in the correct directories.
 
@@ -235,6 +247,37 @@ The interactive script will generate the necessary files for you. The following 
 ```
 This configuration correctly tells the framework: "For `After_Update` on `User`, run Process 10. In this process, first evaluate `ACME_UserActiveCriteria`. On the records that pass, evaluate `ACME_UserBklAction`."
 
+### Domain Method Execution (`DomainMethodExecution`)
+
+`DomainProcessBinding__mdt.ProcessContext__c` selects one of two dispatch contexts:
+
+- **`TriggerExecution`** — the criteria/actions fire automatically from the domain's trigger lifecycle, keyed by `TriggerOperation__c`. Everything above describes this context.
+- **`DomainMethodExecution`** — the same criteria/action machinery fires **only when a specific business operation is explicitly invoked**, keyed by `DomainMethodToken__c`. Use it for logic that belongs to a named operation rather than to every record change. The invocation typically comes from a **service method**, or from **another domain's after-insert/after-update trigger execution**.
+
+**The token.** The token string is the join key between the invocation and its bindings — it is the *public extension contract* of the operation: any package in the org can contribute criteria/actions to it without the invoking code knowing. There is **no naming convention and no prefix requirement** (framework-author ruling, issue #18). The one real constraint is that a token must be **unique across the org's ecosystem** — and since packages cannot see each other's tokens, that uniqueness is enforced only by communication among the development teams. Matching is case-insensitive. When you introduce a token, surface it to the developer as something the team must coordinate on, like a platform event name.
+
+**Binding shape (canonical):** `ProcessContext__c = DomainMethodExecution`, `DomainMethodToken__c` populated, `TriggerOperation__c` nil. Exactly one of the two keying fields is ever populated — `create_injection.cjs` produces this shape from `--context=DomainMethodExecution --token=<Name>`. (Framework quirk, for reading existing orgs only: a binding with a blank token falls back to using its `TriggerOperation__c` value as the token — never author that shape deliberately.)
+
+**Invoking the process — two legitimate patterns:**
+
+1. *A method on the owning domain class* exposes the operation:
+    ```apex
+    // In ACME_Accounts (the owning domain)
+    public void generateSlogans( IApplicationSObjectUnitOfWork uow )
+    {
+        this.getDomainProcessCoordinator().processDomainLogicInjections( 'GenerateSlogans', uow );
+    }
+    ```
+    The method may also carry its own local logic around the injection call — thinness is not mandated.
+2. *A decoupled caller* that knows only the SObject and the token — it never learns which package's domain answers, because the factory resolves it:
+    ```apex
+    // In a service method (possibly in a different package)
+    IApplicationSObjectDomain accounts =
+        (IApplicationSObjectDomain) Application.Domain.newInstance( records );
+    accounts.getDomainProcessCoordinator().processDomainLogicInjections( 'GenerateSlogans', uow );
+    ```
+
+**Transaction boundary:** domain methods do not manage transaction boundaries by default, and domain-method-token executions are no exception — the canonical form **accepts the caller's `IApplicationSObjectUnitOfWork` and passes it through; the injected criteria/actions register work and never commit** (see the `salesforce-platform-enterprise-architecture` skill's UOW Mandates — this is the injected-Action case of the boundary-ownership table). `processDomainLogicInjections` overloads also accept `existingRecords` (a `Map<Id, SObject>`, when the operation has a before/after comparison to offer) and an `IDomainLogicInjectionsParameterable` params object — the parameterized criteria/action interfaces (`IDomainProcessWithParamsCriteria`, `IDomainProcessWithParamsAction`, see the bundled references) are effectively a domain-method-execution feature, since the trigger path has no way to pass params.
 
 ### CRITICAL: Binding to SObjects with Metadata Relationship Limitations
 

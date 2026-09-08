@@ -45,8 +45,10 @@
                 "IApplicationSObjectDomain",
                 "IApplicationSObjectSelector",
                 "IApplicationSObjectUnitOfWork",
+                "IDomainLogicInjectionsParameterable",
                 "IDomainProcessAction",
                 "IDomainProcessActionWithExistingRecs",
+                "IDomainProcessCoordinator",
                 "IDomainProcessCriteria",
                 "IDomainProcessCriteriaWithExistingRecs",
                 "IDomainProcessQueueableAction",
@@ -76,6 +78,7 @@
             "IDomainProcessQueueableAction", "IDomainProcessWithParamsAction",
             "IDomainProcessCriteria", "IDomainProcessCriteriaWithExistingRecs",
             "IDomainProcessWithParamsCriteria",
+            "IDomainLogicInjectionsParameterable", "IDomainProcessCoordinator",
             "Application",
             "ApplicationFactory_DomainBinding__mdt", "DomainProcessBinding__mdt",
             "ApplicationFactory_UnitOfWorkBinding__mdt"

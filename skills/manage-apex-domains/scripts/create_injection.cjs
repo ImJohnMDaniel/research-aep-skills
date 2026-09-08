@@ -26,22 +26,36 @@ if (!isCriteria && !isAction) {
 // Parse custom flags (shared lib, issue #22)
 const flags = parseFlags(process.argv.slice(5));
 
-const isNonInteractive = !!(flags.group && flags.ops);
+// --- Process context (issue #18) ---
+// TriggerExecution bindings key on TriggerOperation__c (--ops); DomainMethodExecution
+// bindings key on DomainMethodToken__c (--token). Exactly one keying flag applies.
+const contextValue = flags.context || "TriggerExecution";
+if (contextValue !== "TriggerExecution" && contextValue !== "DomainMethodExecution") {
+    console.error("Error: --context must be either 'TriggerExecution' or 'DomainMethodExecution'.");
+    process.exit(1);
+}
+const isDomainMethodContext = contextValue === "DomainMethodExecution";
+
+if (isDomainMethodContext && flags.ops) {
+    console.error("Error: --ops applies only to TriggerExecution bindings. A DomainMethodExecution binding is keyed by --token=<TokenName>, not by trigger operations.");
+    process.exit(1);
+}
+if (!isDomainMethodContext && flags.token) {
+    console.error("Error: --token applies only to --context=DomainMethodExecution bindings. TriggerExecution bindings are keyed by --ops.");
+    process.exit(1);
+}
+if (isDomainMethodContext && flags.token === true) {
+    console.error("Error: --token requires a value (e.g., --token=GenerateSlogans).");
+    process.exit(1);
+}
+
+const isNonInteractive = !!(flags.group && (isDomainMethodContext ? flags.token : flags.ops));
 
 // SAFETY CHECK: Without a terminal (agent or CI execution), interactive
 // prompts would hang forever. Fail fast with usage guidance instead.
 if (!process.stdin.isTTY && !isNonInteractive) {
-    console.error("Error: No interactive terminal detected. Provide all required data using command-line flags (--group, --ops, --order, etc.).");
+    console.error(`Error: No interactive terminal detected. Provide all required data using command-line flags (--group, ${isDomainMethodContext ? '--token' : '--ops'}, --order, etc.).`);
     process.exit(1);
-}
-
-// Validate non-interactive flags if supplied
-if (isNonInteractive) {
-    const context = flags.context || "TriggerExecution";
-    if (context !== "TriggerExecution" && context !== "DomainMethodExecution") {
-        console.error("Error: --context must be either 'TriggerExecution' or 'DomainMethodExecution'.");
-        process.exit(1);
-    }
 }
 
 // --- Interactive Prompt Setup ---
@@ -74,9 +88,10 @@ async function run() {
         if (!fs.existsSync(path.dirname(classPath))) fs.mkdirSync(path.dirname(classPath), { recursive: true });
         if (!fs.existsSync(bindingDir)) fs.mkdirSync(bindingDir, { recursive: true });
 
-        // Parse trigger operations early for non-interactive mode
+        // Parse trigger operations early for non-interactive mode (TriggerExecution only)
         let triggerOperations = [];
-        if (isNonInteractive) {
+        let domainMethodToken = isDomainMethodContext ? (flags.token || null) : null;
+        if (isNonInteractive && !isDomainMethodContext) {
             triggerOperations = flags.ops.split(',').map(op => op.trim()).filter(Boolean);
             if (triggerOperations.length === 0) {
                 console.error("Error: No trigger operations specified in --ops.");
@@ -214,25 +229,39 @@ async function run() {
                     process.exit(1);
                 }
 
-                const triggerOpsAnswer = await askQuestion("Enter Trigger Operation(s) (comma-separated, e.g., After_Insert,After_Update): ");
-                triggerOperations = triggerOpsAnswer.split(',').map(op => op.trim()).filter(Boolean);
-                
-                if (triggerOperations.length === 0) {
-                    console.log("No trigger operations specified. Exiting.");
-                    return;
+                if (isDomainMethodContext) {
+                    if (!domainMethodToken) {
+                        domainMethodToken = (await askQuestion("Enter the Domain Method Token name (e.g., GenerateSlogans): ")).trim();
+                    }
+                    if (!domainMethodToken) {
+                        console.log("No domain method token specified. Exiting.");
+                        return;
+                    }
+                } else {
+                    const triggerOpsAnswer = await askQuestion("Enter Trigger Operation(s) (comma-separated, e.g., After_Insert,After_Update): ");
+                    triggerOperations = triggerOpsAnswer.split(',').map(op => op.trim()).filter(Boolean);
+
+                    if (triggerOperations.length === 0) {
+                        console.log("No trigger operations specified. Exiting.");
+                        return;
+                    }
                 }
             }
 
             const bindingTemplateFile = isCriteria ? "CriteriaBindingTemplate.xml" : "ActionBindingTemplate.xml";
             let bindingTemplate = fs.readFileSync(path.join(assetsDir, bindingTemplateFile), "utf8");
 
-            const contextValue = flags.context || "TriggerExecution";
             const descriptionValue = flags.description || `Domain Process for ${sObjectName}`;
 
-            for (const operation of triggerOperations) {
+            // One binding per trigger operation (TriggerExecution), or exactly one
+            // binding keyed by the token (DomainMethodExecution) — issue #18.
+            const bindingKeys = isDomainMethodContext ? [domainMethodToken] : triggerOperations;
+
+            for (const bindingKey of bindingKeys) {
                 // --- START: Custom Naming Convention Logic ---
 
-                // 1. Define the mapping for trigger operation abbreviations.
+                // 1. The binding name's suffix: the trigger operation's abbreviation,
+                // or the domain method token verbatim.
                 const opAbbreviations = {
                     'After_Insert': 'AftIns',
                     'After_Update': 'AftUpt',
@@ -242,9 +271,7 @@ async function run() {
                     'Before_Update': 'BefUpt',
                     'Before_Delete': 'BefDel'
                 };
-
-                // Get the abbreviation for the current operation, or use the full name as a fallback.
-                const abbreviatedOp = opAbbreviations[operation] || operation;
+                const bindingSuffix = isDomainMethodContext ? bindingKey : (opAbbreviations[bindingKey] || bindingKey);
 
                 // 2. Split the component name into prefix and core. A component
                 // name without an underscore has no prefix.
@@ -253,9 +280,14 @@ async function run() {
                 const classNameToAbbreviate = underscoreIndex > 0 ? componentName.substring(underscoreIndex + 1) : componentName;
 
                 // 4. Calculate the maximum length available for the class name part.
-                // Formula: 40 - (prefix + underscore, when present) - (underscore + abbreviation)
+                // Formula: 40 - (prefix + underscore, when present) - (underscore + suffix)
                 const prefixOverhead = prefix ? prefix.length + 1 : 0;
-                const maxClassNameLength = 40 - prefixOverhead - abbreviatedOp.length - 1;
+                const maxClassNameLength = 40 - prefixOverhead - bindingSuffix.length - 1;
+
+                if (maxClassNameLength < 1) {
+                    console.error(`Error: the binding name suffix "${bindingSuffix}" leaves no room for the class name within the 40-character DeveloperName limit (prefix "${prefix}" + suffix consume ${prefixOverhead + bindingSuffix.length + 1} characters). Use a shorter token.`);
+                    process.exit(1);
+                }
 
                 // Abbreviate the class name part by truncating it if it's too long.
                 const abbreviatedClassName = classNameToAbbreviate.length > maxClassNameLength
@@ -264,20 +296,34 @@ async function run() {
 
                 // 5. Construct the final binding name using your specified convention.
                 const bindingName = prefix
-                    ? `${prefix}_${abbreviatedClassName}_${abbreviatedOp}`
-                    : `${abbreviatedClassName}_${abbreviatedOp}`;
+                    ? `${prefix}_${abbreviatedClassName}_${bindingSuffix}`
+                    : `${abbreviatedClassName}_${bindingSuffix}`;
 
                 // --- END: Custom Naming Convention Logic ---
 
                 const bindingPath = path.join(bindingDir, `DomainProcessBinding.${bindingName}.md-meta.xml`);
-                
+
+                // Canonical binding shape (issue #18 ruling): exactly one keying field
+                // is populated — TriggerOperation__c for TriggerExecution,
+                // DomainMethodToken__c for DomainMethodExecution; the other is nil.
+                const triggerOperationValue = isDomainMethodContext
+                    ? `<value xsi:nil="true"/>`
+                    : `<value xsi:type="xsd:string">${bindingKey}</value>`;
+                const domainMethodTokenValue = isDomainMethodContext
+                    ? `<value xsi:type="xsd:string">${bindingKey}</value>`
+                    : `<value xsi:nil="true"/>`;
+                const descriptionSuffix = isDomainMethodContext
+                    ? `for domain method token ${bindingKey}`
+                    : `during ${bindingKey}`;
+
                 let bindingContent = bindingTemplate
                     .replace(/<label>REPLACE_ME<\/label>/, `<label>${bindingName}</label>`)
                     .replace(/<field>ClassToInject__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>ClassToInject__c</field>\n        <value xsi:type="xsd:string">${componentName}</value>`)
-                    .replace(/<field>Description__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>Description__c</field>\n        <value xsi:type="xsd:string">${descriptionValue} during ${operation}</value>`)
+                    .replace(/<field>Description__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>Description__c</field>\n        <value xsi:type="xsd:string">${descriptionValue} ${descriptionSuffix}</value>`)
+                    .replace(/<field>DomainMethodToken__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>DomainMethodToken__c</field>\n        ${domainMethodTokenValue}`)
                     .replace(/<field>OrderOfExecution__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>OrderOfExecution__c</field>\n        <value xsi:type="xsd:double">${finalOrder}</value>`)
                     .replace(/<field>RelatedDomainBindingSObjectAlternate__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>RelatedDomainBindingSObjectAlternate__c</field>\n        <value xsi:type="xsd:string">${sObjectName}</value>`)
-                    .replace(/<field>TriggerOperation__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>TriggerOperation__c</field>\n        <value xsi:type="xsd:string">${operation}</value>`);
+                    .replace(/<field>TriggerOperation__c<\/field>\s*<value.*>REPLACE_ME<\/value>/, `<field>TriggerOperation__c</field>\n        ${triggerOperationValue}`);
 
                 // Dynamic Context Replacement
                 bindingContent = bindingContent.replace(/<field>ProcessContext__c<\/field>\s*<value.*>TriggerExecution<\/value>/, `<field>ProcessContext__c</field>\n        <value xsi:type="xsd:string">${contextValue}</value>`);
@@ -285,7 +331,7 @@ async function run() {
                 const isAsyncAction = !!flags.async && isAction;
                 if (isAsyncAction) {
                     bindingContent = bindingContent.replace(
-                        /<field>ExecuteAsynchronous__c<\/field>\s*<value.*>false<\/value>/, 
+                        /<field>ExecuteAsynchronous__c<\/field>\s*<value.*>false<\/value>/,
                         `<field>ExecuteAsynchronous__c</field>\n        <value xsi:type="xsd:boolean">true</value>`
                     );
                 }

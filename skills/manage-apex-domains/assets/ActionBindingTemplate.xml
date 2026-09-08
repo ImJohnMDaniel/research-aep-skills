@@ -11,6 +11,10 @@
         <value xsi:type="xsd:string">REPLACE_ME</value>
     </values>
     <values>
+        <field>DomainMethodToken__c</field>
+        <value xsi:type="xsd:string">REPLACE_ME</value>
+    </values>
+    <values>
         <field>ExecuteAsynchronous__c</field>
         <value xsi:type="xsd:boolean">false</value>
     </values>
