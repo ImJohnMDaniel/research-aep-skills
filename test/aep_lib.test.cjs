@@ -148,6 +148,72 @@ test('createFileIfMissing: creates once, never overwrites', () => {
     fs.rmSync(tmp, { recursive: true, force: true });
 });
 
+// --- field-list contract surgery (issue #28) ------------------------------------------
+const SELECTOR_CLS = `public inherited sharing class ACME_WidgetsSelector
+    extends ApplicationSObjectSelector
+{
+    public override List<Schema.SObjectField> getSObjectFieldList()
+    {
+        return new List<Schema.SObjectField> {
+            ACME_Widget__c.Id,
+            ACME_Widget__c.Name
+        };
+    }
+
+    public Schema.SObjectType getSObjectType()
+    {
+        return ACME_Widget__c.SObjectType;
+    }
+}`;
+
+test('parseSObjectFieldList: parses the generated shape, brace-on-same-line variant, empty list', () => {
+    const parsed = lib.parseSObjectFieldList(SELECTOR_CLS, 'ACME_Widget__c');
+    assert.equal(parsed.ok, true);
+    assert.deepEqual(parsed.fields.map(f => f.field), ['Id', 'Name']);
+    assert.equal(parsed.entryIndent, '            ');
+
+    const sameLine = SELECTOR_CLS.replace('getSObjectFieldList()\n    {', 'getSObjectFieldList() {');
+    assert.equal(lib.parseSObjectFieldList(sameLine, 'ACME_Widget__c').ok, true);
+
+    const empty = 'class X { public override List<Schema.SObjectField> getSObjectFieldList() { return new List<Schema.SObjectField> {}; } }';
+    const parsedEmpty = lib.parseSObjectFieldList(empty);
+    assert.equal(parsedEmpty.ok, true);
+    assert.equal(parsedEmpty.fields.length, 0);
+});
+
+test('parseSObjectFieldList: shape gate refuses custom logic, non-token entries, wrong SObject, missing method', () => {
+    const customLogic = SELECTOR_CLS.replace('return new', 'if (someFlag) return other();\n        return new');
+    assert.equal(lib.parseSObjectFieldList(customLogic).ok, false);
+    assert.match(lib.parseSObjectFieldList(customLogic).reason, /not a single/);
+
+    const commented = SELECTOR_CLS.replace('ACME_Widget__c.Id,', 'ACME_Widget__c.Id, // key\n');
+    assert.equal(lib.parseSObjectFieldList(commented).ok, false);
+
+    const foreign = lib.parseSObjectFieldList(SELECTOR_CLS, 'Account');
+    assert.equal(foreign.ok, false);
+    assert.match(foreign.reason, /other than Account/);
+
+    assert.equal(lib.parseSObjectFieldList('class X { void other() {} }').ok, false);
+});
+
+test('replaceSObjectFieldList: rewrites only the list, preserving indentation and the rest of the class', () => {
+    const out = lib.replaceSObjectFieldList(SELECTOR_CLS, 'ACME_Widget__c', ['Id', 'Name', 'Status__c']);
+    assert.equal(out.ok, true);
+    assert.ok(out.content.includes('            ACME_Widget__c.Status__c\n        };'));
+    assert.ok(out.content.includes('            ACME_Widget__c.Id,\n            ACME_Widget__c.Name,'));
+    // Everything outside the list is byte-identical
+    assert.ok(out.content.includes('return ACME_Widget__c.SObjectType;'));
+    assert.equal(out.content.split('getSObjectFieldList').length, SELECTOR_CLS.split('getSObjectFieldList').length);
+    // Round-trips through the parser
+    const reparsed = lib.parseSObjectFieldList(out.content, 'ACME_Widget__c');
+    assert.deepEqual(reparsed.fields.map(f => f.field), ['Id', 'Name', 'Status__c']);
+});
+
+test('replaceSObjectFieldList: propagates the shape-gate refusal', () => {
+    const out = lib.replaceSObjectFieldList('class X {}', 'Y__c', ['Id']);
+    assert.equal(out.ok, false);
+});
+
 // --- meta xml -----------------------------------------------------------------------
 test('apexMetaXml: class and trigger shapes', () => {
     const cls = lib.apexMetaXml('ApexClass', '61.0');

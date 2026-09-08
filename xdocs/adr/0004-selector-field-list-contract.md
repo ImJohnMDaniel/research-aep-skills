@@ -19,6 +19,6 @@ A folk belief holds that generated selectors should carry the full field list. T
 
 ## Consequences
 
-- The field-list refresh mode (issue #28) must use merge/report semantics that preserve curation — never wholesale regeneration that would overwrite a deliberately declared contract.
+- The field-list refresh mode (issue #28; shipped as `create_selector.cjs --update-fields`) must use merge/report semantics that preserve curation — never wholesale regeneration that would overwrite a deliberately declared contract. It reports missing contract-eligible fields and appends only on explicit `--add`/`--add-all`; it never removes fields — deletion needs no report, because a deleted field's `Schema.SObjectField` token breaks compilation (the compiler is the staleness report), and a declared field that later fails the default eligibility filters remains a deliberate declaration under rule 4.
 - The `manage-apex-selectors` SKILL.md teaches the contract concept: agents verify that fields their logic depends on are either in the contract or explicitly selected in the query method.
 - Selector-related guidance elsewhere (linter rules, architecture skill) should adopt the "field list contract" vocabulary.

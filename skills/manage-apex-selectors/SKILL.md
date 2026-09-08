@@ -63,7 +63,7 @@ Generates the Selector class, Interface, and Unit Test scaffolding.
     *   **Selector class:** static `newInstance()` method resolving through `Application.Selector`; `extends ApplicationSObjectSelector`; implements its Selector interface; `getSObjectFieldList()`, `getSObjectType()`, and `selectById(Set<Id>)`. Compare against `assets/SelectorTemplate.cls`.
     *   **Interface:** extends `IApplicationSObjectSelector` and declares `selectById(Set<Id>)`.
     *   **Binding:** an `ApplicationFactory_SelectorBinding__mdt` record exists for the SObject, with `To__c` pointing at the Selector class.
-    *   **Field-list contract currency:** `getSObjectFieldList()` is the selector's field list contract to the org (see "The Field List Contract" below). When logic you are writing depends on a field, verify it is in the contract or explicitly select it in the query method via `newQueryFactory().selectField(...)`. A deterministic refresh mode is tracked in issue #28.
+    *   **Field-list contract currency:** `getSObjectFieldList()` is the selector's field list contract to the org (see "The Field List Contract" below). When logic you are writing depends on a field, verify it is in the contract or explicitly select it in the query method via `newQueryFactory().selectField(...)`. To reconcile the contract against the org deterministically, use the script's `--update-fields` mode (see "Refreshing the contract" below).
 4.  **Naming:** Applies the `{APP_PREFIX}_{PluralSObject}Selector` convention (40-char limit), handling standard/custom objects appropriately.
 5.  **Deployment (YOUR responsibility as the agent — the script never deploys):** After generation, first complete the implementation (custom query methods, real test assertions — injectable-method tests generated with `--params` contain TODO assignments that do not compile until filled in), then deploy explicitly, scoped to the paths that were created or modified:
     ```bash
@@ -97,6 +97,21 @@ Default generation honors this contract philosophy:
 - When `--fields` is not provided, the script builds a curated contract from the org describe merged with local field metadata, **excluding** formula fields, long text areas, rich text areas, and blob fields — types that would inflate the heap on every query.
 - The generated contract is capped at **40 fields**. If more than 40 contract-eligible fields exist, the selector is created with `Id` and `Name` only, and the script warns that the contract must be declared manually.
 - A `--fields` list you provide is honored verbatim — it IS the contract you are declaring.
+
+### Refreshing the contract (`--update-fields`)
+
+As the schema grows, the declared contract can fall behind the org. The script's `--update-fields` mode reconciles it with **merge/report semantics** (ADR-0004): the declared contract is preserved verbatim — never regenerated, and nothing is ever removed (a deleted field cannot hide: `Schema.SObjectField` tokens stop compiling the moment the field disappears, so the compiler is the staleness report).
+
+```bash
+node ./scripts/create_selector.cjs <SObjectName> --update-fields [--prefix=MyPrefix] [--add=Field1__c,Field2__c | --add-all]
+```
+
+- **Report-first:** without `--add`/`--add-all`, the run is read-only — it lists the contract-eligible org fields missing from the contract and changes nothing. Show the report to the developer; append only what they confirm.
+- **`--add=<fields>`** appends the named fields (validated against the org describe and local field metadata — a typo aborts before any write). An explicit `--add` is a deliberate contract declaration, so a field the default filters would exclude (formula, long/rich text area, blob) is appended with a warning rather than refused. **`--add-all`** appends every eligible missing field.
+- Exceeding 40 fields produces an advisory warning only — an explicitly declared contract is honored verbatim.
+- **Shape gate:** the mode rewrites only the list inside a `getSObjectFieldList()` that still has the generated shape (a single `return new List<Schema.SObjectField> { ... };`). If the method has been restructured, the script **refuses and modifies nothing** — reconciling that contract is then YOUR responsibility as the agent: read the method, understand the custom logic, and edit surgically.
+- The ownership guardrail applies exactly as in creation mode (standard SObjects require `--confirm-ownership`; foreign-prefix SObjects are always refused).
+- The script never deploys — after an append, deploy the modified class explicitly, scoped, per the Deployment step above.
 
 ## Selector Method Injection (Modular Extension)
 *Use this path to add logic to an **existing** selector discovered in the Pre-flight Check.*

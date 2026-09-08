@@ -141,6 +141,75 @@ function ensureAepCacheDir(subpath, cwd = process.cwd()) {
     return dir;
 }
 
+// --- Selector field-list contract surgery (issue #28 / ADR-0004) -------------------
+// parseSObjectFieldList: locates the getSObjectFieldList() override and verifies it
+// still has the generated shape — a body that is exactly one
+// `return new List<Schema.SObjectField> { Token.Field, ... };` statement. Anything
+// else (custom logic, comments, non-token entries) fails the shape gate: the caller
+// refuses to modify the file and hands reconciliation to the agent. Returns
+// { ok:true, fields:[{token,sobject,field}], interiorStart, interiorEnd, entryIndent,
+//   closeIndent } or { ok:false, reason }.
+function parseSObjectFieldList(classContent, expectedSObject = null) {
+    const sigRe = /public\s+override\s+List<\s*Schema\.SObjectField\s*>\s+getSObjectFieldList\s*\(\s*\)/;
+    const sigMatch = classContent.match(sigRe);
+    if (!sigMatch) {
+        return { ok: false, reason: 'no "public override List<Schema.SObjectField> getSObjectFieldList()" was found' };
+    }
+    let i = sigMatch.index + sigMatch[0].length;
+    while (i < classContent.length && /\s/.test(classContent[i])) i++;
+    if (classContent[i] !== '{') return { ok: false, reason: 'could not locate the method body' };
+    let depth = 0, bodyStart = i + 1, bodyEnd = -1;
+    for (let j = i; j < classContent.length; j++) {
+        if (classContent[j] === '{') depth++;
+        else if (classContent[j] === '}') { depth--; if (depth === 0) { bodyEnd = j; break; } }
+    }
+    if (bodyEnd === -1) return { ok: false, reason: 'unbalanced braces around getSObjectFieldList()' };
+    const body = classContent.slice(bodyStart, bodyEnd);
+    if (!/^\s*return\s+new\s+List<\s*Schema\.SObjectField\s*>\s*\{[\s\S]*\}\s*;\s*$/.test(body)) {
+        return { ok: false, reason: 'the method body is not a single "return new List<Schema.SObjectField> { ... };" statement' };
+    }
+    const listOpen = body.indexOf('{');
+    const listClose = body.lastIndexOf('}');
+    const interior = body.slice(listOpen + 1, listClose);
+    const fields = [];
+    for (const entry of interior.split(',').map(e => e.trim()).filter(e => e.length)) {
+        const m = entry.match(/^([A-Za-z][A-Za-z0-9_]*)\.([A-Za-z][A-Za-z0-9_]*)$/);
+        if (!m) return { ok: false, reason: `list entry "${entry}" is not a plain SObjectField token` };
+        if (expectedSObject && m[1].toLowerCase() !== expectedSObject.toLowerCase()) {
+            return { ok: false, reason: `list entry "${entry}" references an SObject other than ${expectedSObject}` };
+        }
+        fields.push({ token: entry, sobject: m[1], field: m[2] });
+    }
+    // Minimum indent across entry lines — tolerant of files whose first entry was
+    // double-indented by the pre-fix template.
+    const indents = [...interior.matchAll(/\n([ \t]*)\S/g)].map(m => m[1]);
+    const entryIndent = indents.length ? indents.reduce((a, b) => (b.length < a.length ? b : a)) : '            ';
+    const closeMatch = interior.match(/\n([ \t]*)$/);
+    return {
+        ok: true,
+        fields,
+        interiorStart: bodyStart + listOpen + 1,
+        interiorEnd: bodyStart + listClose,
+        entryIndent,
+        closeIndent: closeMatch ? closeMatch[1] : '        '
+    };
+}
+
+// replaceSObjectFieldList: rewrites ONLY the list interior with the given field
+// names (merge semantics are the caller's job — this never decides what to keep).
+// Preserves the file's own indentation. Same {ok, ...} verdict shape as the parser.
+function replaceSObjectFieldList(classContent, sObjectName, fieldNames) {
+    const parsed = parseSObjectFieldList(classContent, sObjectName);
+    if (!parsed.ok) return parsed;
+    const interior = '\n'
+        + fieldNames.map(f => `${parsed.entryIndent}${sObjectName}.${f}`).join(',\n')
+        + '\n' + parsed.closeIndent;
+    return {
+        ok: true,
+        content: classContent.slice(0, parsed.interiorStart) + interior + classContent.slice(parsed.interiorEnd)
+    };
+}
+
 function apexMetaXml(type, apiVersion) {
     return `<?xml version="1.0" encoding="UTF-8"?>\n<${type} xmlns="http://soap.sforce.com/2006/04/metadata">\n    <apiVersion>${apiVersion}</apiVersion>\n    <status>Active</status>\n</${type}>`;
 }
@@ -208,6 +277,8 @@ module.exports = {
     ownershipGuardrail,
     createFileIfMissing,
     ensureAepCacheDir,
+    parseSObjectFieldList,
+    replaceSObjectFieldList,
     apexMetaXml,
     sfJson,
     isVisible,
